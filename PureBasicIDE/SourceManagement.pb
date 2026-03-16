@@ -2297,7 +2297,9 @@ Procedure SaveSourceAs()
   If FileName$ <> ""
     SelectedFilePattern = SelectedFilePattern()
     NewSourcePath$ = GetPathPart(FileName$)
-    
+    If FormAutoCreateEvent = #True
+      SetCurrentDirectory(NewSourcePath$)
+    EndIf
     If GetExtensionPart(GetFilePart(FileName$)) = ""
       If SelectedFilePattern <= 1  ; (=all pb files or pb sources only)
         If *ActiveSource\IsForm

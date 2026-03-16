@@ -4418,6 +4418,197 @@ Procedure FD_MoveMultiSelection(x,y)
   
 EndProcedure
 
+Procedure.i FindProcedure(FindSearchString$)
+
+  If FindSearchString$ = ""
+    ProcedureReturn -1
+  EndIf
+
+  Protected *buffer
+  Protected length
+  Protected result
+  Protected textLength
+  Protected line
+
+  *buffer = UTF8(FindSearchString$)
+  length  = MemorySize(*buffer) - 1
+
+  textLength = SendEditorMessage(#SCI_GETTEXTLENGTH, 0, 0)
+
+  SendEditorMessage(#SCI_SETTARGETSTART, 0, 0)
+  SendEditorMessage(#SCI_SETTARGETEND, textLength, 0)
+
+  result = SendEditorMessage(#SCI_SEARCHINTARGET, length, *buffer)
+
+  FreeMemory(*buffer)
+
+  If result <> -1
+    SendEditorMessage(#SCI_GOTOPOS, result, 0)
+    ProcedureReturn #True
+  EndIf
+
+  ProcedureReturn #False
+
+EndProcedure
+
+Procedure FD_LeftDoubleClick()
+  Protected *UTF8Buffer
+  *UTF8Buffer = UTF8(TextToInsert$)
+
+  FormAutoProcName = #False ;Setting to automatically copy event name from variable name. "True" means variable=Window_0; text=Window_0; event_proc=Event_Window_0 or event_proc=Event_Button_0
+                            ;"False" MessageRequester Ask before setting the variable
+
+  If FormAutoCreateEvent = #False
+    ProcedureReturn
+  EndIf
+
+  Define dbprocname.s = ""
+  Define cellValue.s  = grid_GetCellString(propgrid, 2, 2)
+  Define ConstantValue.s = grid_GetCellString(propgrid, 2, 0)
+  dblClickFormObject.s = ""
+
+
+  ;dblclick on Gadgets
+  ;The `ListSize(ObjList())>1` object is required; a call to `FormWindows()\FormGadgets()` will cause the program to crash if no gadgets are present.
+  Define.s newEvent, currentEvent, displayName, EventName
+  If cellValue = FormWindows()\variable
+    dblClickFormObject = "window"
+    displayName  = FormWindows()\variable
+    newEvent     = "Event_" + displayName
+    currentEvent = FormWindows()\event_proc
+
+  ElseIf FindString(ConstantValue, "#")
+    dblClickFormObject = "menu"
+    displayName  = FormWindows()\FormMenus()\item
+    newEvent     = "Event_" + ReplaceString(displayName, "#", "")
+    currentEvent = FormWindows()\FormMenus()\event
+
+  ElseIf ListSize(ObjList()) > 1
+    dblClickFormObject = "gadget"
+    ChangeCurrentElement(FormWindows()\FormGadgets(), FormWindows()\lastgadgetselected)
+    displayName  = FormWindows()\FormGadgets()\variable
+    newEvent     = "Event_" + displayName
+    currentEvent = FormWindows()\FormGadgets()\event_proc
+  EndIf
+
+  If dblClickFormObject = "" : ProcedureReturn : EndIf
+
+  If FormWindows()\event_proc=""
+    FormWindows()\event_proc = FormWindows()\variable
+  EndIf
+  
+  If currentEvent = ""
+    If FormAutoProcName = #False And MessageRequester(#ProductName$, LanguagePattern("Form","ProcAutoName", "%proc%", displayName), #PB_MessageRequester_YesNo) = #PB_MessageRequester_No
+      ProcedureReturn
+    EndIf
+    EventName = newEvent
+  Else
+    EventName = currentEvent
+  EndIf
+
+  Select dblClickFormObject
+    Case "menu"   : FormWindows()\FormMenus()\event = EventName
+    Case "window" : FormWindows()\event_proc = EventName
+    Case "gadget" : FormWindows()\FormGadgets()\event_proc = EventName
+      If FormWindows()\FormGadgets()\caption = ""
+        FormWindows()\FormGadgets()\caption = displayName
+      EndIf
+  EndSelect
+
+  dbprocname = EventName
+
+  ;if there is no filename, create filename ask for save
+  If GetFilePart(*ActiveSource\FileName$, #PB_FileSystem_NoExtension)=""
+    If SaveSourceAs() = -1
+      MessageRequester(#ProductName$, Language("Form","MessageMainFile"))
+      ProcedureReturn
+    EndIf
+  EndIf
+
+  ;create Main Source File
+  FileName$=GetFilePart(*ActiveSource\FileName$, #PB_FileSystem_NoExtension)
+  Path$=GetCurrentDirectory()
+  FileNameTemp$ = Path$ + FileName$ + ".pb"
+  If FileSize(FileNameTemp$) = -1
+    File = OpenFile(#PB_Any, FileNameTemp$)
+    If File
+      FileSeek(File, Lof(0))
+      WriteStringN(File, "Declare Resize_Window()")
+      WriteStringN(File, "Declare SetWindowTransparency(Window, Alpha)" + #Endline)
+      WriteStringN(File, "XIncludeFile " + Chr(34) + FileName$ + ".pbf" + Chr(34)) ;FormWindows()\variable
+      WriteStringN(File, "XIncludeFile " + Chr(34) + FileName$ + "_events.pb" + Chr(34))
+      WriteStringN(File, "Open" + FormWindows()\variable + "()")
+      WriteStringN(File, "")
+      WriteStringN(File, "Repeat")
+      WriteStringN(File, "   event=WaitWindowEvent()")
+      WriteStringN(File, "   " + FormWindows()\variable + "_Events(event)")
+      WriteStringN(File, "Until event=#PB_Event_CloseWindow")
+      CloseFile(File)
+    EndIf
+  EndIf
+  LoadSourceFile(FileNameTemp$)
+  
+  ;create Event File
+  FileNameTemp$ = Path$ + FileName$ + "_events.pb"
+  If FileSize(FileNameTemp$) =-1 ;Create File
+      File = OpenFile(#PB_Any, FileNameTemp$, #PB_File_Append)
+      CloseFile(File)
+  EndIf
+  
+  LoadSourceFile(FileNameTemp$)
+
+  If FormWindows()\event_proc
+    ProcFound=#False
+    
+    FindSearchString$ = "Procedure " + FormWindows()\event_proc
+
+    If FindProcedure(FindSearchString$) = #False
+        FindNoFormEvent = #True
+        TextToInsert$ = "Procedure " + FormWindows()\event_proc + "(Event, Window)" + #Endline
+        TextToInsert$ + "  If Event = #PB_Event_SizeWindow" + #Endline
+        TextToInsert$ + "    Resize_Window()" + #Endline
+        TextToInsert$ + "  EndIf" + #Endline
+        TextToInsert$ +"EndProcedure" + #Endline + #Endline
+        SendEditorMessage(#SCI_DOCUMENTEND)
+        *UTF8Buffer = UTF8(TextToInsert$)
+        If *UTF8Buffer
+            SendEditorMessage(#SCI_REPLACESEL, 0, *UTF8Buffer)
+            FreeMemory(*UTF8Buffer)
+        EndIf
+    EndIf
+  EndIf
+  
+  ;write the procedure Gadget Handler
+  If dbprocname<>""
+    SendEditorMessage(#SCI_DOCUMENTEND)
+    SendEditorMessage(#SCI_SCROLLCARET)
+
+    ;Find the Gadget Procedure and jump
+    If *ActiveSource <> *ProjectInfo
+      FindSearchString$ = dbprocname
+      
+      If FindProcedure(FindSearchString$) = #False
+        TextToInsert$ = "Procedure " + dbprocname + "(EventType)" + #Endline + "EndProcedure" + #Endline + #Endline
+        SendEditorMessage(#SCI_DOCUMENTEND)
+
+        *UTF8Buffer = UTF8(TextToInsert$)
+        If *UTF8Buffer
+          SendEditorMessage(#SCI_REPLACESEL, 0, *UTF8Buffer)
+          FreeMemory(*UTF8Buffer)
+        EndIf
+        SendEditorMessage(#SCI_SETSEL, 0, 0)
+        FindProcedure(FindSearchString$) ; jump to new procedure line
+        SendEditorMessage(#SCI_VCHOME)
+        SendEditorMessage(#SCI_NEWLINE)
+      Else
+        SendEditorMessage(#SCI_VCHOME)
+        SendEditorMessage(#SCI_LINEDOWN, 0, 0)
+      EndIf
+    EndIf
+  EndIf
+
+EndProcedure
+
 Procedure FD_LeftUp(x,y)
   ChangeCurrentElement(FormWindows(),currentwindow)
   
@@ -7442,7 +7633,22 @@ Procedure FD_EventMain(gadget, event_type)
             x = GetGadgetAttribute(#GADGET_Form_Canvas,#PB_Canvas_MouseX)
             y = GetGadgetAttribute(#GADGET_Form_Canvas,#PB_Canvas_MouseY)
             FD_LeftUp(x,y)
-            
+
+          Case #PB_EventType_LeftDoubleClick
+            FD_LeftDoubleClick()
+            ;
+            drawing = 0
+            moving = 0
+            resizing_win = 0
+            tooldragpos = 0
+            toolselected = 0
+            statusselected = 0
+            statusdragpos = 0
+            menuselected = 0
+            menudragposx = 0
+            menudragposy = 0
+            ;redraw = 1
+
           Case #PB_EventType_RightClick
             x = GetGadgetAttribute(#GADGET_Form_Canvas,#PB_Canvas_MouseX)
             y = GetGadgetAttribute(#GADGET_Form_Canvas,#PB_Canvas_MouseY)

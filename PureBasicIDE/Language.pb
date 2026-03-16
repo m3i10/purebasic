@@ -1098,6 +1098,7 @@ DataSection
   Data$ "FormVariableCaption", "New gadgets use a variable as caption"
   Data$ "FormGrid",            "Grid Visible"
   Data$ "FormEventProcedure",  "Generate event procedure"
+  Data$ "FormAutoCreateEvent", "Auto-create Main and Event handlers"
   Data$ "FormGridSize",        "Grid Size"
   Data$ "FormSkin",            "OS Skin"
   Data$ "FormWarnings",        "Warnings"
@@ -2124,7 +2125,9 @@ DataSection
   Data$ "Option_Always",      "Always"
   Data$ "Option_Backward",    "If backward compatibility is affected"
   Data$ "Option_Never",       "Never"
-  
+  Data$ "ProcAutoName",       "The procedure name for %proc% hasn't been created yet. Create it automatically?"
+  Data$ "MessageMainFile",    "A name for the main file is required to proceed. (Main, Form, and Events files will be created)"
+
   ;Data$ "_GROUP_",            "StatusWindow"
   ; ===================================================
   Data$ "Width",       "Width"
