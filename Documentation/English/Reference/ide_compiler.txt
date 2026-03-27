@@ -262,9 +262,17 @@ MacOS X: The icon must be in ICNS format (Macintosh Icon). To create such an ico
 @LineBreak
 @LineBreak
 
-@Bold "Enable OnError lines support" (Windows only)
+@Bold "Enable OnError lines support"
 @LineBreak
   Includes line numbers information with the executable for the @LibraryLink "onerror" "OnError-Library".
+
+@LineBreak
+@LineBreak
+
+
+@Bold "Enable Wayland support" (Linux only)
+@LineBreak
+   Uses Wayland as graphic backend instead of X11. @LineBreak
 
 @LineBreak
 @LineBreak
