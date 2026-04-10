@@ -384,7 +384,6 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
     FormProcedures(procedurestring) = procedurestring
   EndIf
 
-  ;add by m3i10 Linux only tested
   content+ #Endline
   content+ "CompilerIf #PB_Compiler_OS = #PB_OS_Linux" + #Endline
   content+ "  ImportC " + chr(34) +"-lgtk-3" + chr(34) + #Endline
@@ -410,7 +409,6 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
   content+ "    CompilerEndSelect" + #Endline
   content+ "EndProcedure" + #Endline + #Endline
 
-  ;add Resize Gadgets by m3i10
   content+ "Procedure Resize_Window()" + #Endline
   content+ "  Protected ScaleX.f, ScaleY.f" + #Endline
 
