@@ -383,49 +383,49 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
     procedurestring.s = "Declare " + FormWindows()\event_proc + "(Event, Window)" + #Endline
     FormProcedures(procedurestring) = procedurestring
   EndIf
-
+  
   content+ #Endline
   content+ "CompilerIf #PB_Compiler_OS = #PB_OS_Linux" + #Endline
-  content+ "  ImportC " + chr(34) +"-lgtk-3" + chr(34) + #Endline
+  content+ "  ImportC " + Chr(34) +"-lgtk-3" + Chr(34) + #Endline
   content+ "  gtk_widget_set_opacity(*Widget, Opacity.d)" + #Endline
   content+ "  EndImport" + #Endline
-  content+ "CompilerEndIf" + #Endline
-
-  content+ "Procedure SetWindowTransparency(Window, Alpha)" + #Endline
+  content+ "CompilerEndIf" + #Endline + #Endline
+  
+  content+ "Procedure SetWindowTransparency_" + FormWindows()\variable + "(Window, Alpha)" + #Endline
   content+ "  Protected WinID = WindowID(Window)" + #Endline
-  content+ "  Protected Opacity.d = Alpha / 255.0 ; Von 0.0 bis 1.0" + #Endline
-
+  content+ "  Protected Opacity.d = Alpha / 255.0" + #Endline
+  
   content+ "  CompilerSelect #PB_Compiler_OS" + #Endline
   content+ "    CompilerCase #PB_OS_Windows" + #Endline
   content+ "      SetWindowLongPtr_(WinID, #GWL_EXSTYLE, GetWindowLongPtr_(WinID, #GWL_EXSTYLE) | #WS_EX_LAYERED)" + #Endline
-  content+ "      SetLayeredWindowAttributes_(WinID, 0, Alpha, #LWA_ALPHA)" + #Endline
-
+  content+ "      SetLayeredWindowAttributes_(WinID, 0, Alpha, #LWA_ALPHA)" + #Endline + #Endline
+  
   content+ "    CompilerCase #PB_OS_Linux" + #Endline
-  content+ "      gtk_widget_set_opacity(WinID, Opacity)" + #Endline
-
+  content+ "      gtk_widget_set_opacity(WinID, Opacity)" + #Endline + #Endline
+  
   content+ "    CompilerCase #PB_OS_MacOS" + #Endline
-
-  content+ "      CocoaMessage(0, WinID, " + chr(34) + "setAlphaValue:" + chr(34) + ", @Opacity)" + #Endline
+  
+  content+ "      CocoaMessage(0, WinID, " + Chr(34) + "setAlphaValue:@" + Chr(34) + ", @Opacity)" + #Endline
   content+ "    CompilerEndSelect" + #Endline
   content+ "EndProcedure" + #Endline + #Endline
-
-  content+ "Procedure Resize_Window()" + #Endline
+  
+  content+ "Procedure Resize_" + FormWindows()\variable + "()" + #Endline
   content+ "  Protected ScaleX.f, ScaleY.f" + #Endline
-
-  content+ "  ScaleX =  WindowWidth(" + FormWindows()\variable + ") / " + Str(FormWindows()\width) + #Endline
-  content+ "  ScaleY =  WindowHeight(" + FormWindows()\variable + ") / " + Str(FormWindows()\height) + #Endline
-
+  
+  content+ "  ScaleX =  WindowWidth(" + FormWindows()\variable + ") / " + Str(FormWindows()\width) + " * DesktopResolutionX()" + #Endline
+  content+ "  ScaleY =  WindowHeight(" + FormWindows()\variable + ") / " + Str(FormWindows()\height) + " * DesktopResolutionY()" + #Endline
+  
   ForEach ObjList()
     ChangeCurrentElement(FormWindows()\FormGadgets(),ObjList()\gadget)
-    If  ObjList()\gadget and ObjList()\window = @FormWindows()
-      z2.s = Str(DesktopUnscaledX(FormWindows()\FormGadgets()\x1)) + "*ScaleX, " +  Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y1)) + "*ScaleY, " + Str(DesktopUnscaledX(FormWindows()\FormGadgets()\x2 - FormWindows()\FormGadgets()\x1)) + "*ScaleX, " + Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1)) + "*ScaleY"
+    If  ObjList()\gadget And ObjList()\window = @FormWindows()
+      z2.s = Str(DesktopUnscaledX(FormWindows()\FormGadgets()\x1)) + " * ScaleX, " +  Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y1)) + " * ScaleY, " + Str(DesktopUnscaledX(FormWindows()\FormGadgets()\x2 - FormWindows()\FormGadgets()\x1)) + "*ScaleX, " + Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1)) + "*ScaleY"
       content+ "  ResizeGadget(" + FormWindows()\FormGadgets()\variable + ", " + z2 + ")"   + #Endline
     EndIf
   Next
   content+ "  CompilerIf #PB_Compiler_OS = #PB_OS_Windows : RedrawWindow_(WindowID(0), #Null, #Null, #RDW_INVALIDATE | #RDW_ERASE | #RDW_ALLCHILDREN | #RDW_UPDATENOW) : CompilerEndIf" + #Endline
   content+ "EndProcedure" + #Endline + #Endline
   ;---
-
+  
   ForEach FormProcedures()
     content + FormProcedures()
   Next
@@ -756,7 +756,7 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
                 ;- Change height menu and toolbar calc
                 value = FormWindows()\height - (FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1)
                 If FormSkin = #PB_OS_Windows
-
+                  
                   value - bottompaddingsb - toptoolpadding
                   If ListSize(FormWindows()\FormMenus())
                     value - P_Menu
@@ -1035,10 +1035,10 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
               EndIf
             Next
             ForEach FormWindows()\FormCustomFlags()
-                If flags <> ""
-                  flags + " | "
-                EndIf
-                flags + FormWindows()\FormCustomFlags()
+              If flags <> ""
+                flags + " | "
+              EndIf
+              flags + FormWindows()\FormCustomFlags()
             Next
           EndIf
         Next

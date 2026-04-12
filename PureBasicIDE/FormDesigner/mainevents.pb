@@ -4549,11 +4549,12 @@ Procedure FD_LeftDoubleClick()
     File = OpenFile(#PB_Any, FileNameTemp$)
     If File
       FileSeek(File, Lof(0))
-      WriteStringN(File, "Declare Resize_Window()")
-      WriteStringN(File, "Declare SetWindowTransparency(Window, Alpha)" + #Endline)
+      ;WriteStringN(File, "Declare Resize_Window()")
+      ;WriteStringN(File, "Declare SetWindowTransparency_" + FormWindows()\variable +"(Window, Alpha)" + #Endline)
       WriteStringN(File, "XIncludeFile " + Chr(34) + FileName$ + ".pbf" + Chr(34)) ;FormWindows()\variable
       WriteStringN(File, "XIncludeFile " + Chr(34) + FileName$ + "_events.pb" + Chr(34))
       WriteStringN(File, "Open" + FormWindows()\variable + "()")
+      WriteStringN(File, ";SetWindowTransparency_" + FormWindows()\variable +"(" + FormWindows()\variable + ", 255) ;min. 0: max. 255" + #Endline)      
       WriteStringN(File, "")
       WriteStringN(File, "Repeat")
       WriteStringN(File, "   event=WaitWindowEvent()")
@@ -4582,7 +4583,7 @@ Procedure FD_LeftDoubleClick()
         FindNoFormEvent = #True
         TextToInsert$ = "Procedure " + FormWindows()\event_proc + "(Event, Window)" + #Endline
         TextToInsert$ + "  If Event = #PB_Event_SizeWindow" + #Endline
-        TextToInsert$ + "    Resize_Window()" + #Endline
+        TextToInsert$ + "    Resize_" + FormWindows()\variable + "()" + #Endline
         TextToInsert$ + "  EndIf" + #Endline
         TextToInsert$ +"EndProcedure" + #Endline + #Endline
         SendEditorMessage(#SCI_DOCUMENTEND)
@@ -4604,7 +4605,7 @@ Procedure FD_LeftDoubleClick()
       FindSearchString$ = dbprocname
       
       If FindProcedure(FindSearchString$) = #False
-        TextToInsert$ = "Procedure " + dbprocname + "(EventType)" + #Endline + "EndProcedure" + #Endline + #Endline
+        TextToInsert$ = "Procedure " + dbprocname + "(EventType)" + #Endline + #Endline + "EndProcedure" + #Endline + #Endline
         SendEditorMessage(#SCI_DOCUMENTEND)
 
         *UTF8Buffer = UTF8(TextToInsert$)
