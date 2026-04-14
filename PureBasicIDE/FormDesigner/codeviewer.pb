@@ -418,13 +418,11 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
   ForEach ObjList()
     ChangeCurrentElement(FormWindows()\FormGadgets(),ObjList()\gadget)
     If  ObjList()\gadget And ObjList()\window = @FormWindows()
-      z2.s = Str(DesktopUnscaledX(FormWindows()\FormGadgets()\x1)) + " * ScaleX, " +  Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y1)) + " * ScaleY, " + Str(DesktopUnscaledX(FormWindows()\FormGadgets()\x2 - FormWindows()\FormGadgets()\x1)) + "*ScaleX, " + Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1)) + "*ScaleY"
+      z2.s = Str(DesktopUnscaledX(FormWindows()\FormGadgets()\x1)) + " * ScaleX, " +  Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y1)) + " * ScaleY, " + Str(DesktopUnscaledX(FormWindows()\FormGadgets()\x2 - FormWindows()\FormGadgets()\x1)) + " * ScaleX, " + Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1)) + " * ScaleY"
       content+ "  ResizeGadget(" + FormWindows()\FormGadgets()\variable + ", " + z2 + ")"   + #Endline
     EndIf
   Next
-  content+ "  CompilerIf #PB_Compiler_OS = #PB_OS_Windows : RedrawWindow_(WindowID(0), #Null, #Null, #RDW_INVALIDATE | #RDW_ERASE | #RDW_ALLCHILDREN | #RDW_UPDATENOW) : CompilerEndIf" + #Endline
   content+ "EndProcedure" + #Endline + #Endline
-  ;---
   
   ForEach FormProcedures()
     content + FormProcedures()
