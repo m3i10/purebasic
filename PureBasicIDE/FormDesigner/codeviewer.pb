@@ -385,29 +385,6 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
   EndIf
   
   content+ #Endline
-  content+ "CompilerIf #PB_Compiler_OS = #PB_OS_Linux" + #Endline
-  content+ "  ImportC " + Chr(34) +"-lgtk-3" + Chr(34) + #Endline
-  content+ "  gtk_widget_set_opacity(*Widget, Opacity.d)" + #Endline
-  content+ "  EndImport" + #Endline
-  content+ "CompilerEndIf" + #Endline + #Endline
-  
-  content+ "Procedure SetWindowTransparency_" + FormWindows()\variable + "(Window, Alpha)" + #Endline
-  content+ "  Protected WinID = WindowID(Window)" + #Endline
-  content+ "  Protected Opacity.d = Alpha / 255.0" + #Endline
-  
-  content+ "  CompilerSelect #PB_Compiler_OS" + #Endline
-  content+ "    CompilerCase #PB_OS_Windows" + #Endline
-  content+ "      SetWindowLongPtr_(WinID, #GWL_EXSTYLE, GetWindowLongPtr_(WinID, #GWL_EXSTYLE) | #WS_EX_LAYERED)" + #Endline
-  content+ "      SetLayeredWindowAttributes_(WinID, 0, Alpha, #LWA_ALPHA)" + #Endline + #Endline
-  
-  content+ "    CompilerCase #PB_OS_Linux" + #Endline
-  content+ "      gtk_widget_set_opacity(WinID, Opacity)" + #Endline + #Endline
-  
-  content+ "    CompilerCase #PB_OS_MacOS" + #Endline
-  
-  content+ "      CocoaMessage(0, WinID, " + Chr(34) + "setAlphaValue:@" + Chr(34) + ", @Opacity)" + #Endline
-  content+ "    CompilerEndSelect" + #Endline
-  content+ "EndProcedure" + #Endline + #Endline
   
   content+ "Procedure Resize_" + FormWindows()\variable + "()" + #Endline
   content+ "  Protected ScaleX.f, ScaleY.f" + #Endline
