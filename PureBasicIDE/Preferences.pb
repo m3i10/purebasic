@@ -399,6 +399,7 @@ Procedure LoadPreferences()
   FormGrid = ReadPreferenceLong("Grid", 1)
   FormGridSize = ReadPreferenceLong("GridSize", 10)
   FormEventProcedure = ReadPreferenceLong("EventProcedure", 1)
+  FormAutoCreateEvent = ReadPreferenceLong("AutoCreateEvent", 0)
   FormSkin = ReadPreferenceLong("FormSkin", #PB_Compiler_OS)
   
   Select OSVersion()
@@ -1243,6 +1244,7 @@ Procedure SavePreferences()
     WritePreferenceLong("Grid",             FormGrid)
     WritePreferenceLong("GridSize",         FormGridSize)
     WritePreferenceLong("EventProcedure",   FormEventProcedure)
+    WritePreferenceLong("AutoCreateEvent",  FormAutoCreateEvent)
     WritePreferenceLong("FormSkin",         FormSkin)
     WritePreferenceLong("FormSkinVersion",  FormSkinVersion)
     WritePreferenceLong("VersionWarnings",  FormVersionWarnings)
@@ -1905,6 +1907,7 @@ Procedure IsPreferenceChanged()
   If FormGrid                  <> GetGadgetState(#GADGET_Preferences_FormGrid): ProcedureReturn 1: EndIf
   If FormGridSize              <> Val(GetGadgetText(#GADGET_Preferences_FormGridSize)): ProcedureReturn 1: EndIf
   If FormEventProcedure        <> GetGadgetState(#GADGET_Preferences_FormEventProcedure): ProcedureReturn 1: EndIf
+  If FormAutoCreateEvent       <> GetGadgetState(#GADGET_Preferences_FormAutoCreateEvent): ProcedureReturn 1: EndIf
   If EnableHistory             <> GetGadgetState(#GADGET_Preferences_EnableHistory): ProcedureReturn 1: EndIf
   If HistoryTimer              <> Val(GetGadgetText(#GADGET_Preferences_HistoryTimer)): ProcedureReturn 1: EndIf
   If HistoryMaxFileSize        <> Val(GetGadgetText(#GADGET_Preferences_HistoryMaxFileSize))*1024: ProcedureReturn 1: EndIf
@@ -2297,7 +2300,8 @@ Procedure ApplyPreferences()
   FormGrid                  = GetGadgetState(#GADGET_Preferences_FormGrid)
   FormGridSize              = Val(GetGadgetText(#GADGET_Preferences_FormGridSize))
   FormEventProcedure        = GetGadgetState(#GADGET_Preferences_FormEventProcedure)
-  FormEventProcedure        = GetGadgetState(#GADGET_Preferences_FormEventProcedure)
+  ;FormEventProcedure        = GetGadgetState(#GADGET_Preferences_FormEventProcedure)
+  FormAutoCreateEvent       = GetGadgetState(#GADGET_Preferences_FormAutoCreateEvent)
   FilesPanelMultiline       = GetGadgetState(#GADGET_Preferences_FilesPanelMultiline)
   FilesPanelCloseButtons    = GetGadgetState(#GADGET_Preferences_FilesPanelCloseButtons)
   FilesPanelNewButton       = GetGadgetState(#GADGET_Preferences_FilesPanelNewButton)
@@ -3550,6 +3554,7 @@ Procedure OpenPreferencesWindow()
   SetGadgetState(#GADGET_Preferences_FormGrid, FormGrid)
   SetGadgetText(#GADGET_Preferences_FormGridSize, Str(FormGridSize))
   SetGadgetState(#GADGET_Preferences_FormEventProcedure, FormEventProcedure)
+  SetGadgetState(#GADGET_Preferences_FormAutoCreateEvent, FormAutoCreateEvent)
   
   Select FormSkin
     Case #PB_OS_MacOS

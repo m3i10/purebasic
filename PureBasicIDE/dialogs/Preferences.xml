@@ -896,6 +896,8 @@
                   <checkbox id="#GADGET_Preferences_FormVariableCaption"       lang="Preferences:FormVariableCaption" />
                   <checkbox id="#GADGET_Preferences_FormGrid"       lang="Preferences:FormGrid" />
                   <checkbox id="#GADGET_Preferences_FormEventProcedure"     lang="Preferences:FormEventProcedure" />
+                  <checkbox id="#GADGET_Preferences_FormAutoCreateEvent"     lang="Preferences:FormAutoCreateEvent" />
+
                 </vbox>
                 
                 <gridbox colspacing="10" colexpand="item:2">

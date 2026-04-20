@@ -473,6 +473,7 @@ Runtime Enumeration 1 ; 0 is reserved for uninitialized #PB_Any
   #GADGET_Preferences_FormVariableCaption
   #GADGET_Preferences_FormGrid
   #GADGET_Preferences_FormEventProcedure
+  #GADGET_Preferences_FormAutoCreateEvent
   #GADGET_Preferences_FormGridSize
   #GADGET_Preferences_FormSkin
   #GADGET_Preferences_FormNotRecognizedCaption
@@ -2628,7 +2629,7 @@ Global SaveProjectSettings
 Global EnableMenuIcons, AutoClearLog, DisplayFullPath, DisplayDarkMode, NoSplashScreen, DisplayProtoType, DisplayErrorWindow
 Global InitialSourceLine, MemorizeMarkers, LanguageFile$, ToolsPanelWidth_Hidden, ErrorLogHeight_Hidden
 Global EnableBraceMatch, EnableKeywordMatch, ShowWhiteSpace, ShowIndentGuides, MonitorFileChanges
-Global FormVariable, FormVariableCaption, FormGrid, FormGridSize, FormEventProcedure, FormSkin, FormSkinVersion, FormVersionWarnings
+Global FormVariable, FormVariableCaption, FormGrid, FormGridSize, FormEventProcedure, FormAutoCreateEvent, FormSkin, FormSkinVersion, FormVersionWarnings
 Global FilesPanelMultiline, FilesPanelCloseButtons, FilesPanelNewButton
 Global CurrentZoom, SynchronizingZoom
 Global ExtraWordChars$

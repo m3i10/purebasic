@@ -384,27 +384,8 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
     FormProcedures(procedurestring) = procedurestring
   EndIf
   
-<<<<<<< Updated upstream
-=======
   content+ #Endline
-  content+ "Procedure Save_Window_Pos_" + FormWindows()\variable + "()" + #Endline
-  content+ "  X = WindowX(" + FormWindows()\variable + ")" + #Endline
-  content+ "  Y = WindowY(" + FormWindows()\variable + ")" + #Endline
-  content+ "  width = WindowWidth(" + FormWindows()\variable + ")" + #Endline
-  content+ "  height = WindowHeight(" + FormWindows()\variable + ")" + #Endline
-  content+ "  If CreatePreferences(GetFilePart(ProgramFilename()) + " + #DQUOTE$ + FormWindows()\variable + ".prefs" + #DQUOTE$ + ")" + #Endline
-  content+ "    WritePreferenceInteger(" + #DQUOTE$ + "x" + #DQUOTE$ + ", " + "X)" + #Endline
-  content+ "    WritePreferenceInteger(" + #DQUOTE$ + "y" + #DQUOTE$ + ", " + "Y)" + #Endline
-  content+ "    WritePreferenceInteger(" + #DQUOTE$ + "width" + #DQUOTE$ + ", " + "width)" + #Endline
-  content+ "    WritePreferenceInteger(" + #DQUOTE$ + "height" + #DQUOTE$ + ", " + "height)" + #Endline
-  content+ "    ClosePreferences()" + #Endline
-  content+ "  EndIf" + #Endline
-  content+ "EndProcedure" + #Endline + #Endline
   
-  content+ "Procedure Del_Window_Pos_" + FormWindows()\variable + "()" + #Endline
-  content+ "  DeleteFile(GetFilePart(ProgramFilename()) + " + #DQUOTE$ + FormWindows()\variable + ".prefs" + #DQUOTE$ + ")" + #Endline
-  content+ "EndProcedure" + #Endline + #Endline
-    
   content+ "Procedure Resize_" + FormWindows()\variable + "()" + #Endline
   content+ "  Protected ScaleX.f, ScaleY.f" + #Endline
   
@@ -420,7 +401,6 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
   Next
   content+ "EndProcedure" + #Endline + #Endline
   
->>>>>>> Stashed changes
   ForEach FormProcedures()
     content + FormProcedures()
   Next
@@ -751,7 +731,7 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
                 ;- Change height menu and toolbar calc
                 value = FormWindows()\height - (FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1)
                 If FormSkin = #PB_OS_Windows
-
+                  
                   value - bottompaddingsb - toptoolpadding
                   If ListSize(FormWindows()\FormMenus())
                     value - P_Menu
@@ -1015,14 +995,6 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
         
         content +"Procedure Open"+FormWindows()\variable+"(x = " + winx + ", y = " + winy + ", width = " + Str(DesktopUnscaledX(FormWindows()\width)) + ", height = " + Str(DesktopUnscaledY(FormWindows()\height)) + ")" + #Endline
         
-        content+ "  If OpenPreferences(GetFilePart(ProgramFilename()) + "     + #DQUOTE$ + FormWindows()\variable + ".prefs" + #DQUOTE$ + ")" + #Endline
-        content+ "    X.i = ReadPreferenceInteger("     + #DQUOTE$ + "x"      + #DQUOTE$ + ", X)" + #Endline
-        content+ "    Y.i = ReadPreferenceInteger("     + #DQUOTE$ + "y"      + #DQUOTE$ + ", Y)" + #Endline
-        content+ "    width.i = ReadPreferenceInteger(" + #DQUOTE$ + "width"  + #DQUOTE$ + ", width)" + #Endline
-        content+ "    height.i = ReadPreferenceInteger(" + #DQUOTE$ + "height"  + #DQUOTE$ + ", height)" + #Endline
-        content+ "   ClosePreferences()" + #Endline
-        content+ "  EndIf" + #Endline + #Endline
-        
         AddElement(Procs())
         Procs() = "Open"+FormWindows()\variable+"()"
         
@@ -1038,10 +1010,10 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
               EndIf
             Next
             ForEach FormWindows()\FormCustomFlags()
-                If flags <> ""
-                  flags + " | "
-                EndIf
-                flags + FormWindows()\FormCustomFlags()
+              If flags <> ""
+                flags + " | "
+              EndIf
+              flags + FormWindows()\FormCustomFlags()
             Next
           EndIf
         Next

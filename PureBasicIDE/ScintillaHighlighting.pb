@@ -3367,7 +3367,7 @@ CompilerIf #CompileWindows | #CompileLinux | #CompileMac
     SendEditorMessage(#SCI_CLEARCMDKEY, #SCK_TAB, 0)
     SendEditorMessage(#SCI_CLEARCMDKEY, #SCK_TAB | (#SCMOD_SHIFT << 16), 0)
     SendEditorMessage(#SCI_CLEARCMDKEY, #SCK_RETURN, 0)
-    
+    SendEditorMessage(#SCI_SETADDITIONALSELECTIONTYPING, 1, 0) ;Multi Editing/Typing
     ; remove all shortcuts involving text chars. They produce strange output, and some
     ; even make the IDE crash. Also some will collide with the IDE ones on linux.
     ;

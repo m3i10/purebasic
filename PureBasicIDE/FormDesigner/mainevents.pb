@@ -4434,8 +4434,6 @@ Procedure FD_MoveMultiSelection(x,y)
   
 EndProcedure
 
-<<<<<<< Updated upstream
-=======
 Procedure.i FindProcedure(FindSearchString$)
 
   If FindSearchString$ = ""
@@ -4556,13 +4554,12 @@ Procedure FD_LeftDoubleClick()
       WriteStringN(File, "XIncludeFile " + Chr(34) + FileName$ + ".pbf" + Chr(34)) ;FormWindows()\variable
       WriteStringN(File, "XIncludeFile " + Chr(34) + FileName$ + "_events.pb" + Chr(34))
       WriteStringN(File, "Open" + FormWindows()\variable + "()")
-      WriteStringN(File, "Resize_" + FormWindows()\variable + "()") 
+      WriteStringN(File, ";SetWindowTransparency_" + FormWindows()\variable +"(" + FormWindows()\variable + ", 255) ;min. 0: max. 255" + #Endline)      
       WriteStringN(File, "")
       WriteStringN(File, "Repeat")
       WriteStringN(File, "   event=WaitWindowEvent()")
       WriteStringN(File, "   " + FormWindows()\variable + "_Events(event)")
       WriteStringN(File, "Until event=#PB_Event_CloseWindow")
-      WriteStringN(File, "Save_Window_Pos_" + FormWindows()\variable + "()")
       CloseFile(File)
     EndIf
   EndIf
@@ -4629,7 +4626,6 @@ Procedure FD_LeftDoubleClick()
 
 EndProcedure
 
->>>>>>> Stashed changes
 Procedure FD_LeftUp(x,y)
   ChangeCurrentElement(FormWindows(),currentwindow)
   
@@ -7775,7 +7771,22 @@ Procedure FD_EventMain(gadget, event_type)
             x = GetGadgetAttribute(#GADGET_Form_Canvas,#PB_Canvas_MouseX)
             y = GetGadgetAttribute(#GADGET_Form_Canvas,#PB_Canvas_MouseY)
             FD_LeftUp(x,y)
-            
+
+          Case #PB_EventType_LeftDoubleClick
+            FD_LeftDoubleClick()
+            ;
+            drawing = 0
+            moving = 0
+            resizing_win = 0
+            tooldragpos = 0
+            toolselected = 0
+            statusselected = 0
+            statusdragpos = 0
+            menuselected = 0
+            menudragposx = 0
+            menudragposy = 0
+            ;redraw = 1
+
           Case #PB_EventType_RightClick
             x = GetGadgetAttribute(#GADGET_Form_Canvas,#PB_Canvas_MouseX)
             y = GetGadgetAttribute(#GADGET_Form_Canvas,#PB_Canvas_MouseY)
