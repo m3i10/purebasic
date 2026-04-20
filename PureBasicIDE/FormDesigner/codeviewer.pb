@@ -384,6 +384,43 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
     FormProcedures(procedurestring) = procedurestring
   EndIf
   
+<<<<<<< Updated upstream
+=======
+  content+ #Endline
+  content+ "Procedure Save_Window_Pos_" + FormWindows()\variable + "()" + #Endline
+  content+ "  X = WindowX(" + FormWindows()\variable + ")" + #Endline
+  content+ "  Y = WindowY(" + FormWindows()\variable + ")" + #Endline
+  content+ "  width = WindowWidth(" + FormWindows()\variable + ")" + #Endline
+  content+ "  height = WindowHeight(" + FormWindows()\variable + ")" + #Endline
+  content+ "  If CreatePreferences(GetFilePart(ProgramFilename()) + " + #DQUOTE$ + FormWindows()\variable + ".prefs" + #DQUOTE$ + ")" + #Endline
+  content+ "    WritePreferenceInteger(" + #DQUOTE$ + "x" + #DQUOTE$ + ", " + "X)" + #Endline
+  content+ "    WritePreferenceInteger(" + #DQUOTE$ + "y" + #DQUOTE$ + ", " + "Y)" + #Endline
+  content+ "    WritePreferenceInteger(" + #DQUOTE$ + "width" + #DQUOTE$ + ", " + "width)" + #Endline
+  content+ "    WritePreferenceInteger(" + #DQUOTE$ + "height" + #DQUOTE$ + ", " + "height)" + #Endline
+  content+ "    ClosePreferences()" + #Endline
+  content+ "  EndIf" + #Endline
+  content+ "EndProcedure" + #Endline + #Endline
+  
+  content+ "Procedure Del_Window_Pos_" + FormWindows()\variable + "()" + #Endline
+  content+ "  DeleteFile(GetFilePart(ProgramFilename()) + " + #DQUOTE$ + FormWindows()\variable + ".prefs" + #DQUOTE$ + ")" + #Endline
+  content+ "EndProcedure" + #Endline + #Endline
+    
+  content+ "Procedure Resize_" + FormWindows()\variable + "()" + #Endline
+  content+ "  Protected ScaleX.f, ScaleY.f" + #Endline
+  
+  content+ "  ScaleX =  WindowWidth(" + FormWindows()\variable + ") / " + Str(FormWindows()\width) + " * DesktopResolutionX()" + #Endline
+  content+ "  ScaleY =  WindowHeight(" + FormWindows()\variable + ") / " + Str(FormWindows()\height) + " * DesktopResolutionY()" + #Endline
+  
+  ForEach ObjList()
+    ChangeCurrentElement(FormWindows()\FormGadgets(),ObjList()\gadget)
+    If  ObjList()\gadget And ObjList()\window = @FormWindows()
+      z2.s = Str(DesktopUnscaledX(FormWindows()\FormGadgets()\x1)) + " * ScaleX, " +  Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y1)) + " * ScaleY, " + Str(DesktopUnscaledX(FormWindows()\FormGadgets()\x2 - FormWindows()\FormGadgets()\x1)) + " * ScaleX, " + Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1)) + " * ScaleY"
+      content+ "  ResizeGadget(" + FormWindows()\FormGadgets()\variable + ", " + z2 + ")"   + #Endline
+    EndIf
+  Next
+  content+ "EndProcedure" + #Endline + #Endline
+  
+>>>>>>> Stashed changes
   ForEach FormProcedures()
     content + FormProcedures()
   Next
@@ -977,6 +1014,14 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
         EndIf
         
         content +"Procedure Open"+FormWindows()\variable+"(x = " + winx + ", y = " + winy + ", width = " + Str(DesktopUnscaledX(FormWindows()\width)) + ", height = " + Str(DesktopUnscaledY(FormWindows()\height)) + ")" + #Endline
+        
+        content+ "  If OpenPreferences(GetFilePart(ProgramFilename()) + "     + #DQUOTE$ + FormWindows()\variable + ".prefs" + #DQUOTE$ + ")" + #Endline
+        content+ "    X.i = ReadPreferenceInteger("     + #DQUOTE$ + "x"      + #DQUOTE$ + ", X)" + #Endline
+        content+ "    Y.i = ReadPreferenceInteger("     + #DQUOTE$ + "y"      + #DQUOTE$ + ", Y)" + #Endline
+        content+ "    width.i = ReadPreferenceInteger(" + #DQUOTE$ + "width"  + #DQUOTE$ + ", width)" + #Endline
+        content+ "    height.i = ReadPreferenceInteger(" + #DQUOTE$ + "height"  + #DQUOTE$ + ", height)" + #Endline
+        content+ "   ClosePreferences()" + #Endline
+        content+ "  EndIf" + #Endline + #Endline
         
         AddElement(Procs())
         Procs() = "Open"+FormWindows()\variable+"()"
