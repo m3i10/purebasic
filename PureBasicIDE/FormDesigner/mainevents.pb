@@ -5,6 +5,7 @@
 ; --------------------------------------------------------------------------------------------
 
 Global form_gs_windowmousedx.i, form_gs_windowmousedy.i
+
 Procedure.i FD_NewWindowMouseX(windownr.i)
   Protected wmx.i, dmx.i
   
@@ -166,6 +167,7 @@ Procedure FD_OpenPBFile(proc.s)
       ChangeActiveLine(lineproc + 1, 0)
     EndIf
   EndIf
+  
 EndProcedure
 Procedure FD_CheckVariable(string.s)
   If FindString(string, " ") Or FindString(string, ".") Or FindString(string, "-") Or FindString(string, "/") Or
@@ -1114,7 +1116,49 @@ Procedure FD_UpdateObjList()
     EndIf
     
   EndIf
+  
+  ; We need two state variables—one for this routine and one for the double-click routine—to detect changes.
+  Static LastFormWindowsVariable.s 
+  If FormAutoCreateEvent = #True
+    ForEach FormWindows()\FormGadgets()
+      ; create new Gadget and init
+      If FormWindows()\FormGadgets()\lastvariable = ""
+        FormWindows()\FormGadgets()\lastvariable = FormWindows()\FormGadgets()\variable
+        If FindString(FormWindows()\FormGadgets()\variable, FormWindows()\variable) = 0
+          FormWindows()\FormGadgets()\variable = FormWindows()\variable + "_" + FormWindows()\FormGadgets()\variable
+        EndIf
+        grid_SetCellString(propgrid, 2, 2, FormWindows()\FormGadgets()\variable)
+      EndIf  
+      
+      ;init for first load
+      If FormWindows()\lastvariable = ""
+        FormWindows()\lastvariable = FormWindows()\variable
+        LastFormWindowsVariable = FormWindows()\variable
+      EndIf
+      
+      ;if change the Window Variablename, change all Gadgetsvariable, two
+      If FormWindows()\variable <> LastFormWindowsVariable
+        FormWindows()\FormGadgets()\variable = ReplaceString(FormWindows()\FormGadgets()\variable, LastFormWindowsVariable, FormWindows()\variable)
+      EndIf
+      
+      ;if no Formvariablename in the Gadgetsvariablename then create
+      If FindString(FormWindows()\FormGadgets()\variable, FormWindows()\variable) = 0
+        FormWindows()\FormGadgets()\variable = FormWindows()\variable + "_" + FormWindows()\FormGadgets()\variable
+        GadgetsChanges = #True 
+      EndIf
+      
+    Next
+    
+    ;if the Name change then show
+    If GadgetsChanges = #True
+      ChangeCurrentElement(FormWindows()\FormGadgets(), FormWindows()\lastgadgetselected)
+      grid_SetCellString(propgrid, 2, 2, FormWindows()\FormGadgets()\variable)
+    EndIf
+    LastFormWindowsVariable = FormWindows()\variable
+  EndIf
+  
 EndProcedure
+
 Global NewList Deletelist.i()
 Procedure FD_DeleteGadgetA(gadget)
   ChangeCurrentElement(FormWindows()\FormGadgets(),gadget)
@@ -1214,89 +1258,89 @@ EndProcedure
 Procedure FD_DrawGadget(x1,y1,x2,y2,type, caption.s = "", flag = 0, g_data = -1, items = 0, *pointer = 0)
   If x2 > x1 And y2 > y1
     If CreateImage(#TDrawing_Img, x2-x1, y2-y1, 32) ; Images can be very big and requiers some memory, so ensures we can create it
-      StopDrawing()
+    StopDrawing()
+    
+    fd_fontid = 0
+    If *pointer
+      PushListPosition(FormWindows()\FormGadgets())
+      ChangeCurrentElement(FormWindows()\FormGadgets(),*pointer)
       
-      fd_fontid = 0
-      If *pointer
-        PushListPosition(FormWindows()\FormGadgets())
-        ChangeCurrentElement(FormWindows()\FormGadgets(),*pointer)
+      If FormWindows()\FormGadgets()\captionvariable
+        caption = "[" + caption + "]"
+      EndIf
+      
+      If FormWindows()\FormGadgets()\frontcolor <> -1
+        gadgfrontcolor = RGBA(Red(FormWindows()\FormGadgets()\frontcolor),Green(FormWindows()\FormGadgets()\frontcolor),Blue(FormWindows()\FormGadgets()\frontcolor),255)
+      EndIf
+      If FormWindows()\FormGadgets()\backcolor <> -1
+        gadgbackcolor = RGBA(Red(FormWindows()\FormGadgets()\backcolor),Green(FormWindows()\FormGadgets()\backcolor),Blue(FormWindows()\FormGadgets()\backcolor),255)
+      EndIf
+      
+      If FormWindows()\FormGadgets()\gadgetfont
+        fontkey.s = FormWindows()\FormGadgets()\gadgetfont+Str(FormWindows()\FormGadgets()\gadgetfontsize)
         
-        If FormWindows()\FormGadgets()\captionvariable
-          caption = "[" + caption + "]"
+        If fontflags & FlagValue("#PB_Font_Bold")
+          fontkey + "B"
+        EndIf
+        If fontflags & FlagValue("#PB_Font_Italic")
+          fontkey + "I"
+        EndIf
+        If FormWindows()\FormGadgets()\gadgetfontflags & FlagValue("#PB_Font_Underline")
+          fontkey + "U"
+        EndIf
+        If FormWindows()\FormGadgets()\gadgetfontflags & FlagValue("#PB_Font_StrikeOut")
+          fontkey + "S"
         EndIf
         
-        If FormWindows()\FormGadgets()\frontcolor <> -1
-          gadgfrontcolor = RGBA(Red(FormWindows()\FormGadgets()\frontcolor),Green(FormWindows()\FormGadgets()\frontcolor),Blue(FormWindows()\FormGadgets()\frontcolor),255)
-        EndIf
-        If FormWindows()\FormGadgets()\backcolor <> -1
-          gadgbackcolor = RGBA(Red(FormWindows()\FormGadgets()\backcolor),Green(FormWindows()\FormGadgets()\backcolor),Blue(FormWindows()\FormGadgets()\backcolor),255)
-        EndIf
         
-        If FormWindows()\FormGadgets()\gadgetfont
-          fontkey.s = FormWindows()\FormGadgets()\gadgetfont+Str(FormWindows()\FormGadgets()\gadgetfontsize)
+        If FindMapElement(grids_fonts(),fontkey)
+          fd_fontid = grids_fonts()\hfont
+        Else
+          AddMapElement(grids_fonts(),fontkey)
+          grids_fonts()\fontname = FormWindows()\FormGadgets()\gadgetfont
+          grids_fonts()\fontsize = FormWindows()\FormGadgets()\gadgetfontsize
           
-          If fontflags & FlagValue("#PB_Font_Bold")
-            fontkey + "B"
+          fontflags = 0
+          If FormWindows()\FormGadgets()\gadgetfontflags & FlagValue("#PB_Font_Bold")
+            If fontflags = 0
+              fontflags = #PB_Font_Bold
+            Else
+              fontflags | #PB_Font_Bold
+            EndIf
           EndIf
-          If fontflags & FlagValue("#PB_Font_Italic")
-            fontkey + "I"
+          If FormWindows()\FormGadgets()\gadgetfontflags & FlagValue("#PB_Font_Italic")
+            If fontflags = 0
+              fontflags = #PB_Font_Italic
+            Else
+              fontflags | #PB_Font_Italic
+            EndIf
           EndIf
           If FormWindows()\FormGadgets()\gadgetfontflags & FlagValue("#PB_Font_Underline")
-            fontkey + "U"
+            If fontflags = 0
+              fontflags = #PB_Font_Underline
+            Else
+              fontflags | #PB_Font_Underline
+            EndIf
           EndIf
           If FormWindows()\FormGadgets()\gadgetfontflags & FlagValue("#PB_Font_StrikeOut")
-            fontkey + "S"
+            If fontflags = 0
+              fontflags = #PB_Font_StrikeOut
+            Else
+              fontflags | #PB_Font_StrikeOut
+            EndIf
           EndIf
           
-          
-          If FindMapElement(grids_fonts(),fontkey)
-            fd_fontid = grids_fonts()\hfont
-          Else
-            AddMapElement(grids_fonts(),fontkey)
-            grids_fonts()\fontname = FormWindows()\FormGadgets()\gadgetfont
-            grids_fonts()\fontsize = FormWindows()\FormGadgets()\gadgetfontsize
-            
-            fontflags = 0
-            If FormWindows()\FormGadgets()\gadgetfontflags & FlagValue("#PB_Font_Bold")
-              If fontflags = 0
-                fontflags = #PB_Font_Bold
-              Else
-                fontflags | #PB_Font_Bold
-              EndIf
-            EndIf
-            If FormWindows()\FormGadgets()\gadgetfontflags & FlagValue("#PB_Font_Italic")
-              If fontflags = 0
-                fontflags = #PB_Font_Italic
-              Else
-                fontflags | #PB_Font_Italic
-              EndIf
-            EndIf
-            If FormWindows()\FormGadgets()\gadgetfontflags & FlagValue("#PB_Font_Underline")
-              If fontflags = 0
-                fontflags = #PB_Font_Underline
-              Else
-                fontflags | #PB_Font_Underline
-              EndIf
-            EndIf
-            If FormWindows()\FormGadgets()\gadgetfontflags & FlagValue("#PB_Font_StrikeOut")
-              If fontflags = 0
-                fontflags = #PB_Font_StrikeOut
-              Else
-                fontflags | #PB_Font_StrikeOut
-              EndIf
-            EndIf
-            
-            grids_fonts()\hfont = LoadFont(#PB_Any,grids_fonts()\fontname,grids_fonts()\fontsize, fontflags)
-            fd_fontid = grids_fonts()\hfont
-          EndIf
+          grids_fonts()\hfont = LoadFont(#PB_Any,grids_fonts()\fontname,grids_fonts()\fontsize, fontflags)
+          fd_fontid = grids_fonts()\hfont
         EndIf
       EndIf
-      
-      If fd_fontid = 0
-        fd_fontid = #Form_Font
-      EndIf
-      
-      StartDrawing(ImageOutput(#TDrawing_Img))
+    EndIf
+    
+    If fd_fontid = 0
+      fd_fontid = #Form_Font
+    EndIf
+    
+    StartDrawing(ImageOutput(#TDrawing_Img))
       DrawingMode(#PB_2DDrawing_AllChannels)
       Box(0,0,OutputWidth(),OutputHeight(),  RGBA(0,0,0,0))
       
@@ -3043,8 +3087,8 @@ Procedure FD_DrawGadget(x1,y1,x2,y2,type, caption.s = "", flag = 0, g_data = -1,
         PopListPosition(FormWindows()\FormGadgets())
       EndIf
       
-      StopDrawing()
-      StartDrawing(ImageOutput(#Drawing_Img))
+    StopDrawing()
+    StartDrawing(ImageOutput(#Drawing_Img))
       DrawingMode(#PB_2DDrawing_Transparent)
       If ox1 < xmin Or ox2 > xmax Or oy1 < ymin Or oy2 > ymax ; fast check to avoid using slow filter
         DrawingMode(#PB_2DDrawing_CustomFilter)
@@ -3165,7 +3209,6 @@ EndProcedure
 
 Procedure FD_LeftDown(x,y)
   ChangeCurrentElement(FormWindows(),currentwindow)
-  
   ; Status bar selection
   statusselected = 0
   If ListSize(FormWindows()\FormStatusbars()) Or FormWindows()\status_visible
@@ -3434,48 +3477,48 @@ Procedure FD_LeftDown(x,y)
               If FormWindows()\FormGadgets()\type = #Form_Type_Panel
                 If y >= y1 And y <= y1 + Panel_Height
                   StartDrawing(ImageOutput(#Drawing_Img))
-                  DrawingFont(FontID(#Form_Font))
-                  width = 0
-                  ForEach FormWindows()\FormGadgets()\Items()
-                    width + TextWidth(FormWindows()\FormGadgets()\Items()\name) + 24
-                  Next
-                  
-                  Select FormSkin
-                    Case #PB_OS_MacOS
-                      nx1 = x1 + (x2-x1-width) / 2
-                      ForEach FormWindows()\FormGadgets()\Items()
-                        nx2 = nx1 + TextWidth(FormWindows()\FormGadgets()\Items()\name) + 24
-                        If x >= nx1 And x <= nx2
-                          FormWindows()\FormGadgets()\current_item = ListIndex(FormWindows()\FormGadgets()\Items())
-                          Break
-                        EndIf
-                        
-                        nx1 = nx2
-                      Next
-                    Case #PB_OS_Windows
-                      nx1 = x1
-                      ForEach FormWindows()\FormGadgets()\Items()
-                        nx2 = nx1 + TextWidth(FormWindows()\FormGadgets()\Items()\name) + 12
-                        If x >= nx1 And x <= nx2
-                          FormWindows()\FormGadgets()\current_item = ListIndex(FormWindows()\FormGadgets()\Items())
-                          Break
-                        EndIf
-                        
-                        nx1 = nx2
-                      Next
-                    Case #PB_OS_Linux
-                      nx1 = x1
-                      ForEach FormWindows()\FormGadgets()\Items()
-                        nx2 = nx1 + TextWidth(FormWindows()\FormGadgets()\Items()\name) + 12
-                        If x >= nx1 And x <= nx2
-                          FormWindows()\FormGadgets()\current_item = ListIndex(FormWindows()\FormGadgets()\Items())
-                          Break
-                        EndIf
-                        
-                        nx1 = nx2
-                      Next
-                  EndSelect
-                  
+                    DrawingFont(FontID(#Form_Font))
+                    width = 0
+                    ForEach FormWindows()\FormGadgets()\Items()
+                      width + TextWidth(FormWindows()\FormGadgets()\Items()\name) + 24
+                    Next
+                    
+                    Select FormSkin
+                      Case #PB_OS_MacOS
+                        nx1 = x1 + (x2-x1-width) / 2
+                        ForEach FormWindows()\FormGadgets()\Items()
+                          nx2 = nx1 + TextWidth(FormWindows()\FormGadgets()\Items()\name) + 24
+                          If x >= nx1 And x <= nx2
+                            FormWindows()\FormGadgets()\current_item = ListIndex(FormWindows()\FormGadgets()\Items())
+                            Break
+                          EndIf
+                          
+                          nx1 = nx2
+                        Next
+                      Case #PB_OS_Windows
+                        nx1 = x1
+                        ForEach FormWindows()\FormGadgets()\Items()
+                          nx2 = nx1 + TextWidth(FormWindows()\FormGadgets()\Items()\name) + 12
+                          If x >= nx1 And x <= nx2
+                            FormWindows()\FormGadgets()\current_item = ListIndex(FormWindows()\FormGadgets()\Items())
+                            Break
+                          EndIf
+                          
+                          nx1 = nx2
+                        Next
+                      Case #PB_OS_Linux
+                        nx1 = x1
+                        ForEach FormWindows()\FormGadgets()\Items()
+                          nx2 = nx1 + TextWidth(FormWindows()\FormGadgets()\Items()\name) + 12
+                          If x >= nx1 And x <= nx2
+                            FormWindows()\FormGadgets()\current_item = ListIndex(FormWindows()\FormGadgets()\Items())
+                            Break
+                          EndIf
+                          
+                          nx1 = nx2
+                        Next
+                    EndSelect
+                    
                   StopDrawing()
                 EndIf
               EndIf
@@ -4398,7 +4441,7 @@ Procedure FD_MoveMultiSelection(x,y)
                       multiSelectParent = FormWindows()\FormGadgets()\gadget2
                     EndIf  
                   EndIf
-                
+                  
                 Default
                   multiSelectParent = 0
               EndSelect
@@ -4419,7 +4462,7 @@ Procedure FD_MoveMultiSelection(x,y)
                 moving_firsty = py
               EndIf
             EndIf
-          
+            
           EndIf
         EndIf
       EndIf
@@ -4435,104 +4478,87 @@ Procedure FD_MoveMultiSelection(x,y)
 EndProcedure
 
 Procedure.i FindProcedure(FindSearchString$)
-
   If FindSearchString$ = ""
     ProcedureReturn -1
   EndIf
-
+  
   Protected *buffer
   Protected length
   Protected result
   Protected textLength
   Protected line
-
+  
   *buffer = UTF8(FindSearchString$)
   length  = MemorySize(*buffer) - 1
-
+  
   textLength = SendEditorMessage(#SCI_GETTEXTLENGTH, 0, 0)
-
+  
   SendEditorMessage(#SCI_SETTARGETSTART, 0, 0)
   SendEditorMessage(#SCI_SETTARGETEND, textLength, 0)
-
+  
   result = SendEditorMessage(#SCI_SEARCHINTARGET, length, *buffer)
-
+  
   FreeMemory(*buffer)
-
+  
   If result <> -1
     SendEditorMessage(#SCI_GOTOPOS, result, 0)
     ProcedureReturn #True
   EndIf
-
+  
   ProcedureReturn #False
-
+  
 EndProcedure
 
+Procedure ReplaceEditorText1(SearchText.s, ReplaceText.s)
+  If FindProcedure(SearchText) ; jump to new procedure line
+    SendEditorMessage(#SCI_VCHOME)
+    SendEditorMessage(#SCI_LINEENDEXTEND)
+    
+    *UTF8Buffer = UTF8(ReplaceText)
+    If *UTF8Buffer
+      SendEditorMessage(#SCI_REPLACESEL, 0, *UTF8Buffer)
+      FreeMemory(*UTF8Buffer)
+    EndIf               
+  EndIf
+EndProcedure
+
+Procedure ReplaceAll(Search.s, Replace.s)
+  Protected *S = UTF8(Search), *R = UTF8(Replace)
+  If *S And *R
+    SendEditorMessage(#SCI_SETTARGETSTART, 0, 0)
+    SendEditorMessage(#SCI_SETTARGETEND, SendEditorMessage(#SCI_GETLENGTH, 0, 0), 0)
+    
+    While SendEditorMessage(#SCI_SEARCHINTARGET, MemorySize(*S)-1, *S) <> -1
+      SendEditorMessage(#SCI_REPLACETARGET, -1, *R)
+      SendEditorMessage(#SCI_SETTARGETSTART, SendEditorMessage(#SCI_GETTARGETEND, 0, 0), 0)
+      SendEditorMessage(#SCI_SETTARGETEND, SendEditorMessage(#SCI_GETLENGTH, 0, 0), 0)
+    Wend
+    
+    FreeMemory(*S) : FreeMemory(*R)
+  EndIf
+EndProcedure
+
+
 Procedure FD_LeftDoubleClick()
+  Static FreeGadgetID
   Protected *UTF8Buffer
-  *UTF8Buffer = UTF8(TextToInsert$)
-
-  FormAutoProcName = #False ;Setting to automatically copy event name from variable name. "True" means variable=Window_0; text=Window_0; event_proc=Event_Window_0 or event_proc=Event_Button_0
-                            ;"False" MessageRequester Ask before setting the variable
-
+  Protected FormGadgetsChangeVariable
+  
+  CreateBindEvent  = #True ;Create BindEvent and Eventprocedure.
+  FormAutoProcName = #True ;Setting to automatically copy event name from variable name. "True" means variable=Window_0; text=Window_0; event_proc=Event_Window_0 or event_proc=Event_Button_0
+                           ;"False" MessageRequester Ask before setting the variable
+  
   If FormAutoCreateEvent = #False
     ProcedureReturn
   EndIf
-
-  Define dbprocname.s = ""
-  Define cellValue.s  = grid_GetCellString(propgrid, 2, 2)
-  Define ConstantValue.s = grid_GetCellString(propgrid, 2, 0)
-  dblClickFormObject.s = ""
-
-
-  ;dblclick on Gadgets
-  ;The `ListSize(ObjList())>1` object is required; a call to `FormWindows()\FormGadgets()` will cause the program to crash if no gadgets are present.
-  Define.s newEvent, currentEvent, displayName, EventName
-  If cellValue = FormWindows()\variable
-    dblClickFormObject = "window"
-    displayName  = FormWindows()\variable
-    newEvent     = "Event_" + displayName
-    currentEvent = FormWindows()\event_proc
-
-  ElseIf FindString(ConstantValue, "#")
-    dblClickFormObject = "menu"
-    displayName  = FormWindows()\FormMenus()\item
-    newEvent     = "Event_" + ReplaceString(displayName, "#", "")
-    currentEvent = FormWindows()\FormMenus()\event
-
-  ElseIf ListSize(ObjList()) > 1
-    dblClickFormObject = "gadget"
-    ChangeCurrentElement(FormWindows()\FormGadgets(), FormWindows()\lastgadgetselected)
-    displayName  = FormWindows()\FormGadgets()\variable
-    newEvent     = "Event_" + displayName
-    currentEvent = FormWindows()\FormGadgets()\event_proc
-  EndIf
-
-  If dblClickFormObject = "" : ProcedureReturn : EndIf
-
-  If FormWindows()\event_proc=""
-    FormWindows()\event_proc = FormWindows()\variable
-  EndIf
   
-  If currentEvent = ""
-    If FormAutoProcName = #False And MessageRequester(#ProductName$, LanguagePattern("Form","ProcAutoName", "%proc%", displayName), #PB_MessageRequester_YesNo) = #PB_MessageRequester_No
-      ProcedureReturn
-    EndIf
-    EventName = newEvent
-  Else
-    EventName = currentEvent
-  EndIf
-
-  Select dblClickFormObject
-    Case "menu"   : FormWindows()\FormMenus()\event = EventName
-    Case "window" : FormWindows()\event_proc = EventName
-    Case "gadget" : FormWindows()\FormGadgets()\event_proc = EventName
-      If FormWindows()\FormGadgets()\caption = ""
-        FormWindows()\FormGadgets()\caption = displayName
-      EndIf
-  EndSelect
-
-  dbprocname = EventName
-
+  Define dbprocname.s = ""
+  Define cellVariable.s  = grid_GetCellString(propgrid, 2, 2)
+  Define ConstantValue.s = grid_GetCellString(propgrid, 2, 0)
+  Define MenuBarCellName.s = grid_GetCellString(propgrid, 2, 1)
+  Define MenuBarCellEvent_proc.s = grid_GetCellString(propgrid, 2, 6)
+  dblClickFormObject.s = ""
+  
   ;if there is no filename, create filename ask for save
   If GetFilePart(*ActiveSource\FileName$, #PB_FileSystem_NoExtension)=""
     If SaveSourceAs() = -1
@@ -4540,90 +4566,257 @@ Procedure FD_LeftDoubleClick()
       ProcedureReturn
     EndIf
   EndIf
-
-  ;create Main Source File
-  FileName$=GetFilePart(*ActiveSource\FileName$, #PB_FileSystem_NoExtension)
-  Path$=GetCurrentDirectory()
-  FileNameTemp$ = Path$ + FileName$ + ".pb"
-  If FileSize(FileNameTemp$) = -1
-    File = OpenFile(#PB_Any, FileNameTemp$)
-    If File
-      FileSeek(File, Lof(0))
-      ;WriteStringN(File, "Declare Resize_Window()")
-      ;WriteStringN(File, "Declare SetWindowTransparency_" + FormWindows()\variable +"(Window, Alpha)" + #Endline)
-      WriteStringN(File, "XIncludeFile " + Chr(34) + FileName$ + ".pbf" + Chr(34)) ;FormWindows()\variable
-      WriteStringN(File, "XIncludeFile " + Chr(34) + FileName$ + "_events.pb" + Chr(34))
-      WriteStringN(File, "Open" + FormWindows()\variable + "()")
-      WriteStringN(File, ";SetWindowTransparency_" + FormWindows()\variable +"(" + FormWindows()\variable + ", 255) ;min. 0: max. 255" + #Endline)      
-      WriteStringN(File, "")
-      WriteStringN(File, "Repeat")
-      WriteStringN(File, "   event=WaitWindowEvent()")
-      WriteStringN(File, "   " + FormWindows()\variable + "_Events(event)")
-      WriteStringN(File, "Until event=#PB_Event_CloseWindow")
-      CloseFile(File)
-    EndIf
-  EndIf
-  LoadSourceFile(FileNameTemp$)
   
+  ;create Main Source File
+  FileName$ = GetFilePart(*ActiveSource\FileName$, #PB_FileSystem_NoExtension)
+  
+  Path$ = GetCurrentDirectory()  
   ;create Event File
   FileNameTemp$ = Path$ + FileName$ + "_events.pb"
   If FileSize(FileNameTemp$) =-1 ;Create File
-      File = OpenFile(#PB_Any, FileNameTemp$, #PB_File_Append)
-      CloseFile(File)
+    File = OpenFile(#PB_Any, FileNameTemp$, #PB_File_Append)
+    CloseFile(File)
+    Delay(1000)
   EndIf
   
   LoadSourceFile(FileNameTemp$)
-
-  If FormWindows()\event_proc
-    ProcFound=#False
+  ;If Change the Formname, change the name in Codeeditor, two
+  If FormWindows()\lastvariable <> ""
+    If FormWindows()\lastvariable <> FormWindows()\variable
+      ReplaceAll("_" + FormWindows()\lastvariable + "_" , "_" + FormWindows()\variable + "_")
+      ReplaceAll("_" + FormWindows()\lastvariable + "()" , "_" + FormWindows()\variable + "()")
+      ReplaceAll("= " + FormWindows()\lastvariable, "= " + FormWindows()\variable)
+      ReplaceAll("=" + FormWindows()\lastvariable, "= " + FormWindows()\variable)
+      ReplaceAll("(" + FormWindows()\lastvariable + ")" , "(" + FormWindows()\variable + ")")
+      ReplaceAll("_" + FormWindows()\lastvariable + "_" , "_" + FormWindows()\variable + "_")
+      ReplaceAll("Window" + FormWindows()\lastvariable + "()", "Window" + FormWindows()\variable+ "()")
+      ReplaceAll("Open" + FormWindows()\lastvariable + "()", "Open" + FormWindows()\variable+ "()")
+      ReplaceAll("(" + FormWindows()\lastvariable + "_" , "(" + FormWindows()\variable + "_")
+      ;ReplaceAll(FormWindows()\lastvariable , FormWindows()\variable)
+    EndIf    
+  EndIf
+  FormWindows()\lastvariable = FormWindows()\variable
+  
+  ;- Variable Change
+  ForEach FormWindows()\FormGadgets()
+    If FormWindows()\FormGadgets()\lastvariable <> ""
+      ;if the button create first time   
+      ReplaceAll(FormWindows()\FormGadgets()\lastvariable + "(", FormWindows()\FormGadgets()\variable + "(") ;Gadget Event Procedure
+      ReplaceAll(FormWindows()\FormGadgets()\lastvariable + ",", FormWindows()\FormGadgets()\variable + ",") ;BindGadget
+      FormWindows()\FormGadgets()\lastvariable = FormWindows()\FormGadgets()\variable
+    EndIf
+  Next
+  
+  
+  ;dblclick on Gadgets
+  ;The `ListSize(ObjList())>1` object is required; a call to `FormWindows()\FormGadgets()` will cause the program to crash if no gadgets are present.
+  Define.s newEvent = "", currentEvent = "", displayName = "", EventName  = ""
+  If cellVariable = FormWindows()\variable
+    dblClickFormObject = "window"
+    displayName  = FormWindows()\variable
+    newEvent     = "Event_" + displayName
+    currentEvent = FormWindows()\event_proc
     
-    FindSearchString$ = "Procedure " + FormWindows()\event_proc
-
+  ElseIf FindString(ConstantValue, "#")
+    ChangeCurrentElement(FormWindows()\Formmenus(), lastmenuselected) ;FormWindows()\Formmenus()\lastmenuselected don't work
+    dblClickFormObject = "menu"
+    displayName  = MenuBarCellName
+    newEvent     = "Event_" + "m" + MenuBarCellName
+    currentEvent = FormWindows()\Formmenus()\event
+    
+  ElseIf ListSize(ObjList()) > 1
+    dblClickFormObject = "gadget"
+    ChangeCurrentElement(FormWindows()\FormGadgets(), FormWindows()\lastgadgetselected)
+    If FindString(FormWindows()\FormGadgets()\variable, FormWindows()\variable) = 0
+      FormWindows()\FormGadgets()\variable = FormWindows()\variable + "_" + FormWindows()\FormGadgets()\variable
+      grid_SetCellString(propgrid, 2, 2, FormWindows()\FormGadgets()\variable)
+    EndIf
+    displayName  = ReplaceString(FormWindows()\FormGadgets()\variable, FormWindows()\variable + "_", "")
+    newEvent     = "Event_" + FormWindows()\FormGadgets()\variable
+    currentEvent = FormWindows()\FormGadgets()\event_proc
+  EndIf
+  
+  If dblClickFormObject = "" : ProcedureReturn : EndIf
+  
+  If currentEvent = ""
+    If FormAutoProcName = #False And MessageRequester(#ProductName$,
+                                                      LanguagePattern("Form",
+                                                                      "ProcAutoName", "%proc%", displayName), #PB_MessageRequester_YesNo) = #PB_MessageRequester_No
+      ProcedureReturn
+    EndIf
+    EventName = newEvent
+  Else
+    EventName = currentEvent
+  EndIf
+  
+  Select dblClickFormObject
+    Case "menu"  
+      If CreateBindEvent = #False: FormWindows()\FormMenus()\event = EventName: EndIf
+    Case "window" 
+      If CreateBindEvent = #False: FormWindows()\event_proc = EventName: EndIf
+      FormWindows()\caption = displayName
+      
+    Case "gadget" 
+      If CreateBindEvent = #False: FormWindows()\FormGadgets()\event_proc = EventName: EndIf
+      If FormWindows()\FormGadgets()\caption = ""
+        FormWindows()\FormGadgets()\caption = displayName
+      EndIf
+      
+      If FormWindows()\FormGadgets()\lastvariable = ""
+        FormWindows()\FormGadgets()\lastvariable = FormWindows()\FormGadgets()\variable
+      EndIf      
+  EndSelect
+  
+  ; now the right variable is select
+  
+  TextToInsert$ = ""
+  
+  If FormWindows()\variable  
+    FindSearchString$ = "Procedure " + FormWindows()\variable + "("
+    ; Create Form Event
     If FindProcedure(FindSearchString$) = #False
-        FindNoFormEvent = #True
-        TextToInsert$ = "Procedure " + FormWindows()\event_proc + "(Event, Window)" + #Endline
-        TextToInsert$ + "  If Event = #PB_Event_SizeWindow" + #Endline
-        TextToInsert$ + "    Resize_" + FormWindows()\variable + "()" + #Endline
-        TextToInsert$ + "  EndIf" + #Endline
-        TextToInsert$ +"EndProcedure" + #Endline + #Endline
-        SendEditorMessage(#SCI_DOCUMENTEND)
-        *UTF8Buffer = UTF8(TextToInsert$)
-        If *UTF8Buffer
-            SendEditorMessage(#SCI_REPLACESEL, 0, *UTF8Buffer)
-            FreeMemory(*UTF8Buffer)
-        EndIf
+      If CreateBindEvent = #False
+        TextToInsert$+ "Procedure " + FormWindows()\variable + "(Event, Window)" + #Endline
+        TextToInsert$+ "  If Event = #PB_Event_SizeWindow" + #Endline
+        TextToInsert$+ "    Resize_" + FormWindows()\variable + "()" + #Endline
+        TextToInsert$+ "  EndIf" + #Endline
+        TextToInsert$+"EndProcedure" + #Endline + #Endline
+      EndIf
+    EndIf
+    
+    FindSearchString$ = "Procedure CloseWindow_" + FormWindows()\variable + "()"
+    If FindProcedure(FindSearchString$) = #False
+      TextToInsert$+ "Procedure CloseWindow_" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "  If EventWindow() = " + FormWindows()\variable + #Endline
+      TextToInsert$+ ";   SaveWindowPos" +  FormWindows()\variable + "()" + #EndLine
+      TextToInsert$+ "    CloseWindow(" + FormWindows()\variable + ")" + #Endline
+      TextToInsert$+ "  EndIf" + #Endline
+      TextToInsert$+ "EndProcedure" + #Endline + #Endline
     EndIf
   EndIf
   
   ;write the procedure Gadget Handler
-  If dbprocname<>""
-    SendEditorMessage(#SCI_DOCUMENTEND)
-    SendEditorMessage(#SCI_SCROLLCARET)
-
+  FindSearchString$ = "Procedure OpenWindow" + FormWindows()\variable + "()"
+  If FindProcedure(FindSearchString$) = #False
+    If CreateBindEvent = #False
+      TextToInsert$+ "Procedure OpenWindow" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "  Open" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ #Endline        
+      TextToInsert$+ "OpenWindow" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "; ---- Main Loop" + #Endline
+      TextToInsert$+ "CompilerIf #PB_Compiler_IsMainFile" + #Endline
+      TextToInsert$+ "  Repeat" + #Endline
+      TextToInsert$+ "    If IsWindow(" +  FormWindows()\variable + ")" + #Endline
+      TextToInsert$+ "       event = WaitWindowEvent()" + #Endline
+      TextToInsert$+ "       If EventWindow() = " + FormWindows()\variable + #Endline
+      TextToInsert$+ "       " + #Endline
+      TextToInsert$+ "       EndIf" + #Endline
+      TextToInsert$+ "    Else" + #Endline
+      TextToInsert$+ "       End" + #Endline
+      TextToInsert$+ "    EndIf" + #Endline
+      TextToInsert$+ "   ForEver" + #Endline
+      TextToInsert$+ "EndProcedure" + #Endline
+      TextToInsert$+ "OpenWindow" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "CompilerEndIf" + #Endline
+    Else
+      
+      TextToInsert$+ "Procedure OpenWindow" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "  Open" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "  BindEvent(#PB_Event_SizeWindow, @Resize_" + FormWindows()\variable + "())" + #Endline
+      TextToInsert$+ "  BindEvent(#PB_Event_CloseWindow, @CloseWindow_" + FormWindows()\variable + "())" + #Endline
+      TextToInsert$+ "EndProcedure" + #Endline  
+      TextToInsert$+ #Endline
+      TextToInsert$+ "CompilerIf #PB_Compiler_IsMainFile" + #Endline
+      TextToInsert$+ "OpenWindow" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "; ---- Main Loop" + #Endline
+      TextToInsert$+ "  Repeat" + #Endline
+      TextToInsert$+ "    If IsWindow(" +  FormWindows()\variable + ")" + #Endline
+      TextToInsert$+ "       event = WaitWindowEvent()" + #Endline
+      TextToInsert$+ "       If EventWindow() = " + FormWindows()\variable + #Endline
+      TextToInsert$+ "       " + #Endline
+      TextToInsert$+ "       EndIf" + #Endline
+      TextToInsert$+ "    Else" + #Endline
+      TextToInsert$+ "       End" + #Endline
+      TextToInsert$+ "    EndIf" + #Endline
+      TextToInsert$+ "   ForEver" + #Endline
+      TextToInsert$+ "CompilerEndIf" + #Endline
+      
+    EndIf
+    FirstOpenWindowEntry = #True  
+    
+    
+  EndIf
+  
+  If EventName <> ""
+    FindSearchString$ = "Procedure OpenWindow" + FormWindows()\variable + "()"
+    If FindProcedure(FindSearchString$) = #True ; Find And Jump zo FindProcedure
+      SendEditorMessage(#SCI_LINEUP, 0, 0)
+    EndIf
+    
     ;Find the Gadget Procedure and jump
     If *ActiveSource <> *ProjectInfo
-      FindSearchString$ = dbprocname
+      
+      FindSearchString$ = EventName + "(" ;Procedure for Gadgets
       
       If FindProcedure(FindSearchString$) = #False
-        TextToInsert$ = "Procedure " + dbprocname + "(EventType)" + #Endline + #Endline + "EndProcedure" + #Endline + #Endline
-        SendEditorMessage(#SCI_DOCUMENTEND)
-
+        
+        If FirstOpenWindowEntry = #False 
+          If CreateBindEvent = #False
+            TextToInsert$+ "Procedure " + EventName + "(EventType)" + #Endline + #Endline + "EndProcedure" + #Endline + #Endline
+          Else
+            TextToInsert$+ "Procedure " + EventName + "()" + #Endline + #Endline + "EndProcedure" + #Endline + #Endline
+          EndIf
+        Else ;True
+          If CreateBindEvent = #False
+            TextToInsert$ = "XIncludeFile " + Chr(34) + FileName$ + ".pbf" + Chr(34) + #EndLine + #Endline +
+                            "Procedure " + EventName + "(EventType)" + #Endline + #Endline +
+                            "EndProcedure" + #Endline + #Endline + 
+                            TextToInsert$
+          Else
+            TextToInsert$ = "XIncludeFile " + Chr(34) + FileName$ + ".pbf" + Chr(34) + #EndLine + #Endline +
+                            "Procedure " + EventName + "()" + #Endline + #Endline +
+                            "EndProcedure" + #Endline + #Endline + 
+                            TextToInsert$ + #Endline
+          EndIf
+        EndIf
+        
         *UTF8Buffer = UTF8(TextToInsert$)
         If *UTF8Buffer
           SendEditorMessage(#SCI_REPLACESEL, 0, *UTF8Buffer)
           FreeMemory(*UTF8Buffer)
         EndIf
+        
+        If FindProcedure("BindGadgetEvent(" + FormWindows()\FormGadgets()\variable) = #False
+          FindProcedure("Open" + FormWindows()\variable + "()") ; jump to OpenFormname
+          SendEditorMessage(#SCI_LINEDOWN, 0, 0)
+          ;SendEditorMessage(#SCI_NEWLINE)
+          TextToInsert$ = "  BindGadgetEvent(" + FormWindows()\FormGadgets()\variable + ", @" + EventName + "(), #PB_All)" + #EndLine
+          *UTF8Buffer = UTF8(TextToInsert$)
+          If *UTF8Buffer
+            SendEditorMessage(#SCI_REPLACESEL, 0, *UTF8Buffer)
+            FreeMemory(*UTF8Buffer)
+          EndIf          
+        EndIf
+        
         SendEditorMessage(#SCI_SETSEL, 0, 0)
-        FindProcedure(FindSearchString$) ; jump to new procedure line
+        FindProcedure(EventName + "(") ; jump to new procedure line
         SendEditorMessage(#SCI_VCHOME)
         SendEditorMessage(#SCI_NEWLINE)
-      Else
-        SendEditorMessage(#SCI_VCHOME)
-        SendEditorMessage(#SCI_LINEDOWN, 0, 0)
+      Else ; --- jump to procedure
+           ; --- change the procedurename with variablename
+        If FormGadgetsChangeVariable = #True  
+          
+          FindProcedure(FindSearchString$) ;jump to the procedure
+          SendEditorMessage(#SCI_VCHOME)
+          SendEditorMessage(#SCI_LINEDOWN, 0, 0)          
+        Else
+          SendEditorMessage(#SCI_VCHOME)
+          SendEditorMessage(#SCI_LINEDOWN, 0, 0)
+        EndIf  
       EndIf
     EndIf
   EndIf
-
+  
 EndProcedure
 
 Procedure FD_LeftUp(x,y)
@@ -5180,6 +5373,8 @@ Procedure FD_LeftUp(x,y)
     FD_SelectMenu(menuselected)
   EndIf
   
+  lastmenuselected = menuselected
+  ;TODO: FormWindows()\FormMenus()\lastmenuselected = menuselected ; don't work in MAC
   scrolling = 0 : scrollingx = 0 : scrollingy = 0 : delta = 0
   moveresizeundo = 0 : moveundo = 0 : resizeundo = 0
   drawing = 0
@@ -5236,1005 +5431,1005 @@ Procedure FD_Redraw()
     
     
     StartDrawing(ImageOutput(#Drawing_Img))
-    DrawingMode(#PB_2DDrawing_Transparent)
-    Box(0,0,OutputWidth(),OutputHeight(), RGB(150, 150, 150))
-    
-    ;{ Draw the window
-    Select FormSkin
-      Case #PB_OS_MacOS
-        DrawingMode(#PB_2DDrawing_Transparent)
-        color = RGB(237, 237, 237)
+      DrawingMode(#PB_2DDrawing_Transparent)
+      Box(0,0,OutputWidth(),OutputHeight(), RGB(150, 150, 150))
+      
+      ;{ Draw the window
+      Select FormSkin
+        Case #PB_OS_MacOS
+          DrawingMode(#PB_2DDrawing_Transparent)
+          color = RGB(237, 237, 237)
+          
+          If FormWindows()\color > -1
+            color = FormWindows()\color
+          EndIf
+          
+          RoundBox(#Page_Padding - FormWindows()\paddingx - 1,#Page_Padding - FormWindows()\paddingy - 1 + topmenupadding,FormWindows()\width + 2,FormWindows()\height + 2 + topwinpadding + toptoolpadding, 4,4, color)
+          DrawingMode(#PB_2DDrawing_Outlined)
+          RoundBox(#Page_Padding - FormWindows()\paddingx - 1,#Page_Padding - FormWindows()\paddingy - 1 + topmenupadding,FormWindows()\width + 2,FormWindows()\height + 2 + topwinpadding + toptoolpadding, 4,4, RGB(184,184,184))
+          
+          FD_DrawResizeButton(#Page_Padding - FormWindows()\paddingx + FormWindows()\width + 2,#Page_Padding - FormWindows()\paddingy + FormWindows()\height + topmenupadding + toptoolpadding + topwinpadding + 2)
+        Case #PB_OS_Windows
+          DrawingMode(#PB_2DDrawing_Transparent)
+          color = RGB(240, 240, 240)
+          
+          If FormWindows()\color > -1
+            color = FormWindows()\color
+          EndIf
+          
+          Select FormSkinVersion
+            Case 7
+              ; window has a 8px border
+              DrawingMode(#PB_2DDrawing_Gradient)
+              BackColor(RGB(210, 232, 232))
+              GradientColor(0.5, RGB(184,220,250))
+              FrontColor(RGB(210, 232, 232))
+              LinearGradient(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy - 1, #Page_Padding - FormWindows()\paddingx + (FormWindows()\width + 16),#Page_Padding - FormWindows()\paddingy - 1)
+              
+              RoundBox(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy - 1,FormWindows()\width + 16,FormWindows()\height + topwinpadding + 8, 4,4) ; , RGB(210, 232, 232))
+              DrawingMode(#PB_2DDrawing_Outlined)
+              RoundBox(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy - 1,FormWindows()\width + 16,FormWindows()\height + topwinpadding + 8, 4,4, RGB(37, 37, 37))
+              Box(#Page_Padding - FormWindows()\paddingx + 7, #Page_Padding - FormWindows()\paddingy + topwinpadding - 1, FormWindows()\width + 2, FormWindows()\height + 2, RGB(93, 108, 122))
+              DrawingMode(#PB_2DDrawing_Transparent)
+              Box(#Page_Padding - FormWindows()\paddingx + 8, #Page_Padding - FormWindows()\paddingy + topwinpadding , FormWindows()\width, FormWindows()\height, color)
+              
+            Case 8
+              Box(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy - 1,FormWindows()\width + 16,FormWindows()\height + topwinpadding + 8, RGB(107,173,246))
+              DrawingMode(#PB_2DDrawing_Outlined)
+              Box(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy - 1,FormWindows()\width + 16,FormWindows()\height + topwinpadding + 8, RGB(82,132,188))
+              Box(#Page_Padding - FormWindows()\paddingx + 7, #Page_Padding - FormWindows()\paddingy + topwinpadding - 1, FormWindows()\width + 2, FormWindows()\height + 2, RGB(91, 147, 209))
+              DrawingMode(#PB_2DDrawing_Transparent)
+              Box(#Page_Padding - FormWindows()\paddingx + 8, #Page_Padding - FormWindows()\paddingy + topwinpadding , FormWindows()\width, FormWindows()\height, color)
+          EndSelect
+          
+          FD_DrawResizeButton(#Page_Padding - FormWindows()\paddingx + FormWindows()\width + 16 + 2,#Page_Padding - FormWindows()\paddingy + FormWindows()\height + topwinpadding + 8 + 2)
+        Case #PB_OS_Linux
+          DrawingMode(#PB_2DDrawing_Transparent)
+          color = RGB(242,241,240)
+          
+          If FormWindows()\color > -1
+            color = FormWindows()\color
+          EndIf
+          
+          If topwinpadding
+            RoundBox(#Page_Padding - FormWindows()\paddingx - 1,#Page_Padding - 1 - FormWindows()\paddingy,FormWindows()\width + 2,FormWindows()\height + 1 + topwinpadding, 6,6, color)
+          EndIf
+          Box(#Page_Padding - 1 - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + topwinpadding,FormWindows()\width + 2,FormWindows()\height + 1, color)
+          
+          DrawingMode(#PB_2DDrawing_Outlined)
+          Box(#Page_Padding - 1 - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + topwinpadding,FormWindows()\width + 2,FormWindows()\height + 2,RGB(70,70,70))
+          DrawingMode(#PB_2DDrawing_Transparent)
+          
+          FD_DrawResizeButton(#Page_Padding - FormWindows()\paddingx + FormWindows()\width + 2,#Page_Padding - FormWindows()\paddingy + FormWindows()\height + topwinpadding + 2)
+      EndSelect ;}
+      
+      ;{ Draw the grid (if applicable)
+      If FormGrid
+        i = 0
         
-        If FormWindows()\color > -1
-          color = FormWindows()\color
-        EndIf
-        
-        RoundBox(#Page_Padding - FormWindows()\paddingx - 1,#Page_Padding - FormWindows()\paddingy - 1 + topmenupadding,FormWindows()\width + 2,FormWindows()\height + 2 + topwinpadding + toptoolpadding, 4,4, color)
-        DrawingMode(#PB_2DDrawing_Outlined)
-        RoundBox(#Page_Padding - FormWindows()\paddingx - 1,#Page_Padding - FormWindows()\paddingy - 1 + topmenupadding,FormWindows()\width + 2,FormWindows()\height + 2 + topwinpadding + toptoolpadding, 4,4, RGB(184,184,184))
-        
-        FD_DrawResizeButton(#Page_Padding - FormWindows()\paddingx + FormWindows()\width + 2,#Page_Padding - FormWindows()\paddingy + FormWindows()\height + topmenupadding + toptoolpadding + topwinpadding + 2)
-      Case #PB_OS_Windows
-        DrawingMode(#PB_2DDrawing_Transparent)
-        color = RGB(240, 240, 240)
-        
-        If FormWindows()\color > -1
-          color = FormWindows()\color
-        EndIf
-        
-        Select FormSkinVersion
-          Case 7
-            ; window has a 8px border
-            DrawingMode(#PB_2DDrawing_Gradient)
-            BackColor(RGB(210, 232, 232))
-            GradientColor(0.5, RGB(184,220,250))
-            FrontColor(RGB(210, 232, 232))
-            LinearGradient(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy - 1, #Page_Padding - FormWindows()\paddingx + (FormWindows()\width + 16),#Page_Padding - FormWindows()\paddingy - 1)
-            
-            RoundBox(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy - 1,FormWindows()\width + 16,FormWindows()\height + topwinpadding + 8, 4,4) ; , RGB(210, 232, 232))
-            DrawingMode(#PB_2DDrawing_Outlined)
-            RoundBox(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy - 1,FormWindows()\width + 16,FormWindows()\height + topwinpadding + 8, 4,4, RGB(37, 37, 37))
-            Box(#Page_Padding - FormWindows()\paddingx + 7, #Page_Padding - FormWindows()\paddingy + topwinpadding - 1, FormWindows()\width + 2, FormWindows()\height + 2, RGB(93, 108, 122))
-            DrawingMode(#PB_2DDrawing_Transparent)
-            Box(#Page_Padding - FormWindows()\paddingx + 8, #Page_Padding - FormWindows()\paddingy + topwinpadding , FormWindows()\width, FormWindows()\height, color)
-            
-          Case 8
-            Box(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy - 1,FormWindows()\width + 16,FormWindows()\height + topwinpadding + 8, RGB(107,173,246))
-            DrawingMode(#PB_2DDrawing_Outlined)
-            Box(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy - 1,FormWindows()\width + 16,FormWindows()\height + topwinpadding + 8, RGB(82,132,188))
-            Box(#Page_Padding - FormWindows()\paddingx + 7, #Page_Padding - FormWindows()\paddingy + topwinpadding - 1, FormWindows()\width + 2, FormWindows()\height + 2, RGB(91, 147, 209))
-            DrawingMode(#PB_2DDrawing_Transparent)
-            Box(#Page_Padding - FormWindows()\paddingx + 8, #Page_Padding - FormWindows()\paddingy + topwinpadding , FormWindows()\width, FormWindows()\height, color)
+        Select FormSkin
+          Case #PB_OS_MacOS
+            gridpadding = #Page_Padding - FormWindows()\paddingy + topwinpadding + topmenupadding + toptoolpadding
+            gridyend = FormWindows()\height
+          Case #PB_OS_Windows
+            gridpadding = #Page_Padding - FormWindows()\paddingy + topwinpadding + topmenupadding + toptoolpadding
+            gridyend = FormWindows()\height - (topmenupadding + toptoolpadding)
+          Case #PB_OS_Linux
+            gridpadding = #Page_Padding - FormWindows()\paddingy + topwinpadding + topmenupadding + toptoolpadding
+            gridyend = FormWindows()\height - (topmenupadding + toptoolpadding)
         EndSelect
         
-        FD_DrawResizeButton(#Page_Padding - FormWindows()\paddingx + FormWindows()\width + 16 + 2,#Page_Padding - FormWindows()\paddingy + FormWindows()\height + topwinpadding + 8 + 2)
-      Case #PB_OS_Linux
-        DrawingMode(#PB_2DDrawing_Transparent)
-        color = RGB(242,241,240)
-        
-        If FormWindows()\color > -1
-          color = FormWindows()\color
-        EndIf
-        
-        If topwinpadding
-          RoundBox(#Page_Padding - FormWindows()\paddingx - 1,#Page_Padding - 1 - FormWindows()\paddingy,FormWindows()\width + 2,FormWindows()\height + 1 + topwinpadding, 6,6, color)
-        EndIf
-        Box(#Page_Padding - 1 - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + topwinpadding,FormWindows()\width + 2,FormWindows()\height + 1, color)
-        
-        DrawingMode(#PB_2DDrawing_Outlined)
-        Box(#Page_Padding - 1 - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + topwinpadding,FormWindows()\width + 2,FormWindows()\height + 2,RGB(70,70,70))
-        DrawingMode(#PB_2DDrawing_Transparent)
-        
-        FD_DrawResizeButton(#Page_Padding - FormWindows()\paddingx + FormWindows()\width + 2,#Page_Padding - FormWindows()\paddingy + FormWindows()\height + topwinpadding + 2)
-    EndSelect ;}
-    
-    ;{ Draw the grid (if applicable)
-    If FormGrid
-      i = 0
-      
-      Select FormSkin
-        Case #PB_OS_MacOS
-          gridpadding = #Page_Padding - FormWindows()\paddingy + topwinpadding + topmenupadding + toptoolpadding
-          gridyend = FormWindows()\height
-        Case #PB_OS_Windows
-          gridpadding = #Page_Padding - FormWindows()\paddingy + topwinpadding + topmenupadding + toptoolpadding
-          gridyend = FormWindows()\height - (topmenupadding + toptoolpadding)
-        Case #PB_OS_Linux
-          gridpadding = #Page_Padding - FormWindows()\paddingy + topwinpadding + topmenupadding + toptoolpadding
-          gridyend = FormWindows()\height - (topmenupadding + toptoolpadding)
-      EndSelect
-      
-      While i < FormWindows()\width
-        j = 0
-        While j < gridyend
-          Box(#Page_Padding - FormWindows()\paddingx + leftpadding + i,gridpadding + j,1,1,RGB(30,30,30))
-          j + FormGridSize
+        While i < FormWindows()\width
+          j = 0
+          While j < gridyend
+            Box(#Page_Padding - FormWindows()\paddingx + leftpadding + i,gridpadding + j,1,1,RGB(30,30,30))
+            j + FormGridSize
+          Wend
+          i + FormGridSize
         Wend
-        i + FormGridSize
-      Wend
-    EndIf ;}
-    
-    ;{ Draw the window's system menu
-    If FormWindows()\flags & FlagValue("#PB_Window_SystemMenu") Or FormWindows()\flags & FlagValue("#PB_Window_TitleBar")
-      Select FormSkin
-        Case #PB_OS_MacOS
-          DrawingMode(#PB_2DDrawing_Outlined)
-          Line(#Page_Padding - FormWindows()\paddingx - 1,#Page_Padding - 1 + topmenupadding - FormWindows()\paddingy+22,FormWindows()\width + 2,1,RGB(184,184,184))
-          
-          DrawingMode(#PB_2DDrawing_Gradient)
-          BackColor(RGB(228,228,228))
-          
-          If toptoolpadding = 0
-            FrontColor(RGB(183,183,183))
-            LinearGradient(#Page_Padding - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + topmenupadding,#Page_Padding - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + topmenupadding + 21)
-          Else
+      EndIf ;}
+      
+      ;{ Draw the window's system menu
+      If FormWindows()\flags & FlagValue("#PB_Window_SystemMenu") Or FormWindows()\flags & FlagValue("#PB_Window_TitleBar")
+        Select FormSkin
+          Case #PB_OS_MacOS
+            DrawingMode(#PB_2DDrawing_Outlined)
+            Line(#Page_Padding - FormWindows()\paddingx - 1,#Page_Padding - 1 + topmenupadding - FormWindows()\paddingy+22,FormWindows()\width + 2,1,RGB(184,184,184))
+            
+            DrawingMode(#PB_2DDrawing_Gradient)
+            BackColor(RGB(228,228,228))
+            
+            If toptoolpadding = 0
+              FrontColor(RGB(183,183,183))
+              LinearGradient(#Page_Padding - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + topmenupadding,#Page_Padding - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + topmenupadding + 21)
+            Else
+              FrontColor(RGB(175,175,175))
+              LinearGradient(#Page_Padding - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + topmenupadding,#Page_Padding - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + topmenupadding + 90)
+            EndIf
+            
+            FillArea(#Page_Padding - FormWindows()\paddingx + 3,#Page_Padding - FormWindows()\paddingy + topmenupadding + 20,RGB(184,184,184))
+            DrawingMode(#PB_2DDrawing_Transparent)
+            
+            If toptoolpadding = 0
+              Line(#Page_Padding - FormWindows()\paddingx - 1,#Page_Padding - 1 - FormWindows()\paddingy + topmenupadding+22,FormWindows()\width + 2,1,RGB(105,105,105))
+            EndIf
+            
+            DrawAlphaImage(ImageID(#Img_MacClose),#Page_Padding - FormWindows()\paddingx + 9,#Page_Padding - FormWindows()\paddingy + topmenupadding+5)
+            
+            If FormWindows()\flags & FlagValue("#PB_Window_MinimizeGadget")
+              DrawAlphaImage(ImageID(#Img_MacMin),#Page_Padding - FormWindows()\paddingx + 9 + 12 + 9,#Page_Padding - FormWindows()\paddingy + topmenupadding+5)
+            Else
+              DrawAlphaImage(ImageID(#Img_MacDis),#Page_Padding - FormWindows()\paddingx + 9 + 12 + 9,#Page_Padding - FormWindows()\paddingy + topmenupadding+5)
+            EndIf
+            
+            If FormWindows()\flags & FlagValue("#PB_Window_MaximizeGadget")
+              DrawAlphaImage(ImageID(#Img_MacMax),#Page_Padding - FormWindows()\paddingx + 9 + 12 + 9 + 12 + 9,#Page_Padding - FormWindows()\paddingy + topmenupadding+5)
+            Else
+              DrawAlphaImage(ImageID(#Img_MacDis),#Page_Padding - FormWindows()\paddingx + 9 + 12 + 9 + 12 + 9,#Page_Padding - FormWindows()\paddingy + topmenupadding+5)
+            EndIf
+            
+            ; Drawing title twice to get the shadow effect
+            DrawingFont(FontID(#Form_Font))
+            DrawText(#Page_Padding - FormWindows()\paddingx + (FormWindows()\width - TextWidth(FormWindows()\caption))/2,#Page_Padding - FormWindows()\paddingy + topmenupadding+5,FormWindows()\caption,RGB(255,255,255))
+            DrawText(#Page_Padding - FormWindows()\paddingx + (FormWindows()\width - TextWidth(FormWindows()\caption))/2,#Page_Padding - FormWindows()\paddingy + topmenupadding+4,FormWindows()\caption,RGB(54,54,54))
+          Case #PB_OS_Windows
+            Select FormSkinVersion
+              Case 7
+                DrawAlphaImage(ImageID(#Img_WindowsIcon),#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + 8)
+                
+                DrawAlphaImage(ImageID(#Img_Win7Close),#Page_Padding - FormWindows()\paddingx + 8 + FormWindows()\width - 47,#Page_Padding - FormWindows()\paddingy - 1)
+                
+                If FormWindows()\flags & FlagValue("#PB_Window_MinimizeGadget")
+                  DrawAlphaImage(ImageID(#Img_Win7Min),#Page_Padding - FormWindows()\paddingx + 8 + FormWindows()\width - 47 - 26 - 29,#Page_Padding - FormWindows()\paddingy - 1)
+                ElseIf FormWindows()\flags & FlagValue("#PB_Window_MaximizeGadget")
+                  DrawAlphaImage(ImageID(#Img_Win7MinDis),#Page_Padding - FormWindows()\paddingx + 8 + FormWindows()\width - 47 - 26 - 29,#Page_Padding - FormWindows()\paddingy - 1)
+                EndIf
+                
+                If FormWindows()\flags & FlagValue("#PB_Window_MaximizeGadget")
+                  DrawAlphaImage(ImageID(#Img_Win7Max),#Page_Padding - FormWindows()\paddingx + 8 + FormWindows()\width - 47 - 26,#Page_Padding - FormWindows()\paddingy - 1)
+                ElseIf FormWindows()\flags & FlagValue("#PB_Window_MinimizeGadget")
+                  DrawAlphaImage(ImageID(#Img_Win7MaxDis),#Page_Padding - FormWindows()\paddingx + 8 + FormWindows()\width - 47 - 26,#Page_Padding - FormWindows()\paddingy - 1)
+                EndIf
+                
+                DrawingFont(FontID(#Form_Font))
+                DrawText(#Page_Padding - FormWindows()\paddingx + 8 + 21,#Page_Padding - FormWindows()\paddingy + 8,FormWindows()\caption,RGB(0,0,0))
+              Case 8
+                DrawAlphaImage(ImageID(#Img_WindowsIcon),#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + 8)
+                endpos = #Page_Padding - FormWindows()\paddingx + 8 + ImageWidth(#Img_WindowsIcon)
+                
+                pos = #Page_Padding - FormWindows()\paddingx + 8 + FormWindows()\width - ImageWidth(#Img_Win8Close)
+                DrawAlphaImage(ImageID(#Img_Win8Close),pos,#Page_Padding - FormWindows()\paddingy )
+                
+                If FormWindows()\flags & FlagValue("#PB_Window_MaximizeGadget")
+                  pos - ImageWidth(#Img_Win8Max)
+                  DrawAlphaImage(ImageID(#Img_Win8Max),pos,#Page_Padding - FormWindows()\paddingy )
+                EndIf
+                
+                If FormWindows()\flags & FlagValue("#PB_Window_MinimizeGadget")
+                  pos - ImageWidth(#Img_Win8Min)
+                  DrawAlphaImage(ImageID(#Img_Win8Min),pos,#Page_Padding - FormWindows()\paddingy )
+                EndIf
+                
+                DrawingFont(FontID(#Form_Font))
+                pos = endpos + (pos - endpos - TextWidth(FormWindows()\caption)) / 2
+                DrawText(pos,#Page_Padding - FormWindows()\paddingy + 8,FormWindows()\caption,RGB(0,0,0))
+            EndSelect
+          Case #PB_OS_Linux
+            DrawingMode(#PB_2DDrawing_Transparent)
+            color = RGB(70,70,70)
+            RoundBox(#Page_Padding - 1 - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy,FormWindows()\width + 2,P_WinHeight, 6,6, color)
+            Box(#Page_Padding - 1 - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + 6,FormWindows()\width + 2,P_WinHeight -6, color)
+            
+            DrawAlphaImage(ImageID(#Img_LinuxClose),#Page_Padding - FormWindows()\paddingx + 11,#Page_Padding - FormWindows()\paddingy + 4)
+            pos = #Page_Padding - FormWindows()\paddingx + 11 + ImageWidth(#Img_LinuxClose)
+            If FormWindows()\flags & FlagValue("#PB_Window_MinimizeGadget")
+              DrawAlphaImage(ImageID(#Img_LinuxMin),pos,#Page_Padding - FormWindows()\paddingy + 4)
+              pos + ImageWidth(#Img_LinuxMin)
+            EndIf
+            
+            If FormWindows()\flags & FlagValue("#PB_Window_MaximizeGadget")
+              DrawAlphaImage(ImageID(#Img_LinuxMax),pos,#Page_Padding - FormWindows()\paddingy + 4)
+              pos + ImageWidth(#Img_LinuxMax)
+            EndIf
+            
+            DrawingFont(FontID(#Form_Font))
+            DrawText(pos + 12,#Page_Padding - FormWindows()\paddingy + 6,FormWindows()\caption,RGB(255,255,255))
+        EndSelect
+      EndIf ;}
+      
+      ;{ Draw toolbar
+      If toptoolpadding
+        Select FormSkin ;{
+          Case #PB_OS_MacOS
+            DrawingMode(#PB_2DDrawing_Gradient)
+            BackColor(RGB(228,228,228))
             FrontColor(RGB(175,175,175))
-            LinearGradient(#Page_Padding - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + topmenupadding,#Page_Padding - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + topmenupadding + 90)
-          EndIf
-          
-          FillArea(#Page_Padding - FormWindows()\paddingx + 3,#Page_Padding - FormWindows()\paddingy + topmenupadding + 20,RGB(184,184,184))
-          DrawingMode(#PB_2DDrawing_Transparent)
-          
-          If toptoolpadding = 0
-            Line(#Page_Padding - FormWindows()\paddingx - 1,#Page_Padding - 1 - FormWindows()\paddingy + topmenupadding+22,FormWindows()\width + 2,1,RGB(105,105,105))
-          EndIf
-          
-          DrawAlphaImage(ImageID(#Img_MacClose),#Page_Padding - FormWindows()\paddingx + 9,#Page_Padding - FormWindows()\paddingy + topmenupadding+5)
-          
-          If FormWindows()\flags & FlagValue("#PB_Window_MinimizeGadget")
-            DrawAlphaImage(ImageID(#Img_MacMin),#Page_Padding - FormWindows()\paddingx + 9 + 12 + 9,#Page_Padding - FormWindows()\paddingy + topmenupadding+5)
-          Else
-            DrawAlphaImage(ImageID(#Img_MacDis),#Page_Padding - FormWindows()\paddingx + 9 + 12 + 9,#Page_Padding - FormWindows()\paddingy + topmenupadding+5)
-          EndIf
-          
-          If FormWindows()\flags & FlagValue("#PB_Window_MaximizeGadget")
-            DrawAlphaImage(ImageID(#Img_MacMax),#Page_Padding - FormWindows()\paddingx + 9 + 12 + 9 + 12 + 9,#Page_Padding - FormWindows()\paddingy + topmenupadding+5)
-          Else
-            DrawAlphaImage(ImageID(#Img_MacDis),#Page_Padding - FormWindows()\paddingx + 9 + 12 + 9 + 12 + 9,#Page_Padding - FormWindows()\paddingy + topmenupadding+5)
-          EndIf
-          
-          ; Drawing title twice to get the shadow effect
-          DrawingFont(FontID(#Form_Font))
-          DrawText(#Page_Padding - FormWindows()\paddingx + (FormWindows()\width - TextWidth(FormWindows()\caption))/2,#Page_Padding - FormWindows()\paddingy + topmenupadding+5,FormWindows()\caption,RGB(255,255,255))
-          DrawText(#Page_Padding - FormWindows()\paddingx + (FormWindows()\width - TextWidth(FormWindows()\caption))/2,#Page_Padding - FormWindows()\paddingy + topmenupadding+4,FormWindows()\caption,RGB(54,54,54))
-        Case #PB_OS_Windows
-          Select FormSkinVersion
-            Case 7
-              DrawAlphaImage(ImageID(#Img_WindowsIcon),#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + 8)
-              
-              DrawAlphaImage(ImageID(#Img_Win7Close),#Page_Padding - FormWindows()\paddingx + 8 + FormWindows()\width - 47,#Page_Padding - FormWindows()\paddingy - 1)
-              
-              If FormWindows()\flags & FlagValue("#PB_Window_MinimizeGadget")
-                DrawAlphaImage(ImageID(#Img_Win7Min),#Page_Padding - FormWindows()\paddingx + 8 + FormWindows()\width - 47 - 26 - 29,#Page_Padding - FormWindows()\paddingy - 1)
-              ElseIf FormWindows()\flags & FlagValue("#PB_Window_MaximizeGadget")
-                DrawAlphaImage(ImageID(#Img_Win7MinDis),#Page_Padding - FormWindows()\paddingx + 8 + FormWindows()\width - 47 - 26 - 29,#Page_Padding - FormWindows()\paddingy - 1)
-              EndIf
-              
-              If FormWindows()\flags & FlagValue("#PB_Window_MaximizeGadget")
-                DrawAlphaImage(ImageID(#Img_Win7Max),#Page_Padding - FormWindows()\paddingx + 8 + FormWindows()\width - 47 - 26,#Page_Padding - FormWindows()\paddingy - 1)
-              ElseIf FormWindows()\flags & FlagValue("#PB_Window_MinimizeGadget")
-                DrawAlphaImage(ImageID(#Img_Win7MaxDis),#Page_Padding - FormWindows()\paddingx + 8 + FormWindows()\width - 47 - 26,#Page_Padding - FormWindows()\paddingy - 1)
-              EndIf
-              
-              DrawingFont(FontID(#Form_Font))
-              DrawText(#Page_Padding - FormWindows()\paddingx + 8 + 21,#Page_Padding - FormWindows()\paddingy + 8,FormWindows()\caption,RGB(0,0,0))
-            Case 8
-              DrawAlphaImage(ImageID(#Img_WindowsIcon),#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + 8)
-              endpos = #Page_Padding - FormWindows()\paddingx + 8 + ImageWidth(#Img_WindowsIcon)
-              
-              pos = #Page_Padding - FormWindows()\paddingx + 8 + FormWindows()\width - ImageWidth(#Img_Win8Close)
-              DrawAlphaImage(ImageID(#Img_Win8Close),pos,#Page_Padding - FormWindows()\paddingy )
-              
-              If FormWindows()\flags & FlagValue("#PB_Window_MaximizeGadget")
-                pos - ImageWidth(#Img_Win8Max)
-                DrawAlphaImage(ImageID(#Img_Win8Max),pos,#Page_Padding - FormWindows()\paddingy )
-              EndIf
-              
-              If FormWindows()\flags & FlagValue("#PB_Window_MinimizeGadget")
-                pos - ImageWidth(#Img_Win8Min)
-                DrawAlphaImage(ImageID(#Img_Win8Min),pos,#Page_Padding - FormWindows()\paddingy )
-              EndIf
-              
-              DrawingFont(FontID(#Form_Font))
-              pos = endpos + (pos - endpos - TextWidth(FormWindows()\caption)) / 2
-              DrawText(pos,#Page_Padding - FormWindows()\paddingy + 8,FormWindows()\caption,RGB(0,0,0))
-          EndSelect
-        Case #PB_OS_Linux
-          DrawingMode(#PB_2DDrawing_Transparent)
-          color = RGB(70,70,70)
-          RoundBox(#Page_Padding - 1 - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy,FormWindows()\width + 2,P_WinHeight, 6,6, color)
-          Box(#Page_Padding - 1 - FormWindows()\paddingx,#Page_Padding - 1 - FormWindows()\paddingy + 6,FormWindows()\width + 2,P_WinHeight -6, color)
-          
-          DrawAlphaImage(ImageID(#Img_LinuxClose),#Page_Padding - FormWindows()\paddingx + 11,#Page_Padding - FormWindows()\paddingy + 4)
-          pos = #Page_Padding - FormWindows()\paddingx + 11 + ImageWidth(#Img_LinuxClose)
-          If FormWindows()\flags & FlagValue("#PB_Window_MinimizeGadget")
-            DrawAlphaImage(ImageID(#Img_LinuxMin),pos,#Page_Padding - FormWindows()\paddingy + 4)
-            pos + ImageWidth(#Img_LinuxMin)
-          EndIf
-          
-          If FormWindows()\flags & FlagValue("#PB_Window_MaximizeGadget")
-            DrawAlphaImage(ImageID(#Img_LinuxMax),pos,#Page_Padding - FormWindows()\paddingy + 4)
-            pos + ImageWidth(#Img_LinuxMax)
-          EndIf
-          
-          DrawingFont(FontID(#Form_Font))
-          DrawText(pos + 12,#Page_Padding - FormWindows()\paddingy + 6,FormWindows()\caption,RGB(255,255,255))
-      EndSelect
-    EndIf ;}
-    
-    ;{ Draw toolbar
-    If toptoolpadding
-      Select FormSkin ;{
-        Case #PB_OS_MacOS
-          DrawingMode(#PB_2DDrawing_Gradient)
-          BackColor(RGB(228,228,228))
-          FrontColor(RGB(175,175,175))
-          LinearGradient(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topmenupadding,#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topmenupadding + 90)
-          Box(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding,FormWindows()\width,toptoolpadding)
-          
-          DrawingMode(#PB_2DDrawing_Transparent)
-          Line(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topmenupadding+ topwinpadding + toptoolpadding,FormWindows()\width,1,RGB(105,105,105))
-          
-          toolx = #Page_Padding - FormWindows()\paddingx + 7
-          tooly = #Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding + 3
-        Case #PB_OS_Windows
-          DrawingMode(#PB_2DDrawing_Transparent)
-          Box(#Page_Padding - FormWindows()\paddingx +8,#Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding,FormWindows()\width,toptoolpadding,RGB(240, 240, 240))
-          
-          toolx = #Page_Padding - FormWindows()\paddingx + 8 + 5
-          tooly = #Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding + 3
-        Case #PB_OS_Linux
-          DrawingMode(#PB_2DDrawing_Transparent)
-          Box(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding,FormWindows()\width,toptoolpadding,RGB(242, 241, 240))
-          
-          toolx = #Page_Padding - FormWindows()\paddingx + 8 + 5
-          tooly = #Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding + 3
-      EndSelect ;}
-      
-      ForEach FormWindows()\FormToolbars()
-        If tooldragpos
-          diff = 5
-          
-          If tooldragpos > toolx - diff And tooldragpos < toolx + diff
-            Line(toolx - 3, tooly, 1, 16, RGB(0,0,255))
-            Line(toolx - 2, tooly, 1, 16, RGB(0,0,255))
-          ElseIf ListIndex(FormWindows()\FormToolbars()) = ListSize(FormWindows()\FormToolbars()) -1 And tooldragpos > toolx + diff
-            Line(toolx + 16, tooly, 1, 16, RGB(0,0,255))
-            Line(toolx + 17, tooly, 1, 16, RGB(0,0,255))
-          EndIf
-        EndIf
-        
-        If FormWindows()\FormToolbars()\separator = 1
-          If propgrid_toolbar = FormWindows()\FormToolbars()
-            DrawingMode(#PB_2DDrawing_Outlined)
-            Box(toolx - 1, tooly - 1, 8, 18, RGB(0,0,0))
+            LinearGradient(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topmenupadding,#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topmenupadding + 90)
+            Box(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding,FormWindows()\width,toptoolpadding)
+            
             DrawingMode(#PB_2DDrawing_Transparent)
+            Line(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topmenupadding+ topwinpadding + toptoolpadding,FormWindows()\width,1,RGB(105,105,105))
+            
+            toolx = #Page_Padding - FormWindows()\paddingx + 7
+            tooly = #Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding + 3
+          Case #PB_OS_Windows
+            DrawingMode(#PB_2DDrawing_Transparent)
+            Box(#Page_Padding - FormWindows()\paddingx +8,#Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding,FormWindows()\width,toptoolpadding,RGB(240, 240, 240))
+            
+            toolx = #Page_Padding - FormWindows()\paddingx + 8 + 5
+            tooly = #Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding + 3
+          Case #PB_OS_Linux
+            DrawingMode(#PB_2DDrawing_Transparent)
+            Box(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding,FormWindows()\width,toptoolpadding,RGB(242, 241, 240))
+            
+            toolx = #Page_Padding - FormWindows()\paddingx + 8 + 5
+            tooly = #Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding + 3
+        EndSelect ;}
+        
+        ForEach FormWindows()\FormToolbars()
+          If tooldragpos
+            diff = 5
+            
+            If tooldragpos > toolx - diff And tooldragpos < toolx + diff
+              Line(toolx - 3, tooly, 1, 16, RGB(0,0,255))
+              Line(toolx - 2, tooly, 1, 16, RGB(0,0,255))
+            ElseIf ListIndex(FormWindows()\FormToolbars()) = ListSize(FormWindows()\FormToolbars()) -1 And tooldragpos > toolx + diff
+              Line(toolx + 16, tooly, 1, 16, RGB(0,0,255))
+              Line(toolx + 17, tooly, 1, 16, RGB(0,0,255))
+            EndIf
           EndIf
           
-          Select FormSkin
-            Case #PB_OS_Windows, #PB_OS_Linux
-              Line(toolx + 2,tooly + 1, 1, 14, RGB(132,132,132))
-              FormWindows()\FormToolbars()\x1 = toolx
-              FormWindows()\FormToolbars()\x2 = toolx + 10
-              FormWindows()\FormToolbars()\y = tooly
-              toolx + 10
-            Case #PB_OS_MacOS
-              FormWindows()\FormToolbars()\x1 = toolx
-              FormWindows()\FormToolbars()\x2 = toolx + 10
-              FormWindows()\FormToolbars()\y = tooly
-              toolx + 10
-          EndSelect
-        Else
-          If FormWindows()\FormToolbars()\img
-            ChangeCurrentElement(FormWindows()\FormImg(),FormWindows()\FormToolbars()\img)
-            img = ImageManager(FormWindows()\FormImg()\img)
-          Else
-            img = #IMAGE_FormIcons_Image
-          EndIf
-          
-          If IsImage(img)
-            If ImageDepth(img) = 32
-              DrawingMode(#PB_2DDrawing_AlphaBlend | #PB_2DDrawing_Transparent)
-            Else
+          If FormWindows()\FormToolbars()\separator = 1
+            If propgrid_toolbar = FormWindows()\FormToolbars()
+              DrawingMode(#PB_2DDrawing_Outlined)
+              Box(toolx - 1, tooly - 1, 8, 18, RGB(0,0,0))
               DrawingMode(#PB_2DDrawing_Transparent)
             EndIf
             
-            DrawImage(ImageID(img),toolx,tooly,16,16)
+            Select FormSkin
+              Case #PB_OS_Windows, #PB_OS_Linux
+                Line(toolx + 2,tooly + 1, 1, 14, RGB(132,132,132))
+                FormWindows()\FormToolbars()\x1 = toolx
+                FormWindows()\FormToolbars()\x2 = toolx + 10
+                FormWindows()\FormToolbars()\y = tooly
+                toolx + 10
+              Case #PB_OS_MacOS
+                FormWindows()\FormToolbars()\x1 = toolx
+                FormWindows()\FormToolbars()\x2 = toolx + 10
+                FormWindows()\FormToolbars()\y = tooly
+                toolx + 10
+            EndSelect
+          Else
+            If FormWindows()\FormToolbars()\img
+              ChangeCurrentElement(FormWindows()\FormImg(),FormWindows()\FormToolbars()\img)
+              img = ImageManager(FormWindows()\FormImg()\img)
+            Else
+              img = #IMAGE_FormIcons_Image
+            EndIf
+            
+            If IsImage(img)
+              If ImageDepth(img) = 32
+                DrawingMode(#PB_2DDrawing_AlphaBlend | #PB_2DDrawing_Transparent)
+              Else
+                DrawingMode(#PB_2DDrawing_Transparent)
+              EndIf
+              
+              DrawImage(ImageID(img),toolx,tooly,16,16)
+              DrawingMode(#PB_2DDrawing_Transparent)
+            EndIf
+            
+            If propgrid_toolbar = FormWindows()\FormToolbars()
+              DrawingMode(#PB_2DDrawing_Outlined)
+              Box(toolx - 1, tooly - 1, 18, 18, RGB(0,0,0))
+              DrawingMode(#PB_2DDrawing_Transparent)
+            EndIf
+            
+            FormWindows()\FormToolbars()\x1 = toolx
+            FormWindows()\FormToolbars()\x2 = toolx + 16
+            FormWindows()\FormToolbars()\y = tooly
+            
+            toolx + 16 + 6
+          EndIf
+        Next
+        FormWindows()\toolbar_buttonx = toolx
+        FormWindows()\toolbar_buttony = tooly
+        
+        DrawingMode(#PB_2DDrawing_AlphaBlend | #PB_2DDrawing_Transparent)
+        DrawImage(ImageID(#Img_Plus),toolx,tooly)
+        DrawingMode(#PB_2DDrawing_Transparent)
+      EndIf ;}
+      
+      ;{ Draw Status Bar
+      If bottompaddingsb
+        Select FormSkin ;{
+          Case #PB_OS_MacOS
+            sbx = #Page_Padding - FormWindows()\paddingx + 7
+            sby = #Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding + toptoolpadding + FormWindows()\height - bottompaddingsb
+            
             DrawingMode(#PB_2DDrawing_Transparent)
+            Line(sbx - 7,sby,FormWindows()\width,1,RGB(184,184,184))
+            
+            DrawingMode(#PB_2DDrawing_Gradient)
+            BackColor(RGB(211,211,211))
+            FrontColor(RGB(1171,171,171))
+            LinearGradient(sbx,sby,sbx,sby+23)
+            
+            RoundBox(#Page_Padding,sby,FormWindows()\width,bottompaddingsb,3,3)
+            
+            DrawingMode(#PB_2DDrawing_Transparent)
+            Line(sbx - 7,sby,FormWindows()\width,1,RGB(118,118,118))
+            DrawingFont(FontID(#Form_Font))
+          Case #PB_OS_Windows
+            sbx = #Page_Padding - FormWindows()\paddingx + 8 + 7
+            sby = #Page_Padding - FormWindows()\paddingy + topwinpadding + FormWindows()\height - bottompaddingsb
+            
+            DrawingMode(#PB_2DDrawing_Transparent)
+            Line(sbx - 7,sby,FormWindows()\width,1,RGB(145,145,145))
+          Case #PB_OS_Linux
+            sbx = #Page_Padding - FormWindows()\paddingx + 8 + 7
+            sby = #Page_Padding - FormWindows()\paddingy + topwinpadding + FormWindows()\height - bottompaddingsb
+            
+            DrawingMode(#PB_2DDrawing_Transparent)
+            Line(sbx - 8 - 7,sby,FormWindows()\width,1,RGB(145,145,145))
+        EndSelect ;}
+        
+        ; if #pb_ignore is used, calculate the width of those fields
+        sbcountignore = 0
+        sbcountwidth = 0
+        ForEach FormWindows()\FormStatusbars()
+          If FormWindows()\FormStatusbars()\width = -1
+            sbcountignore + 1
+          Else
+            sbcountwidth + FormWindows()\FormStatusbars()\width
+          EndIf
+        Next
+        sbremainingwidth = FormWindows()\width - 14 - sbcountwidth
+        
+        ForEach FormWindows()\FormStatusbars()
+          If FormWindows()\FormStatusbars()\width > -1
+            sbwidth = FormWindows()\FormStatusbars()\width
+          Else
+            sbwidth = sbremainingwidth / sbcountignore
           EndIf
           
-          If propgrid_toolbar = FormWindows()\FormToolbars()
+          If propgrid_statusbar = FormWindows()\FormStatusbars()
             DrawingMode(#PB_2DDrawing_Outlined)
-            Box(toolx - 1, tooly - 1, 18, 18, RGB(0,0,0))
+            Box(sbx, sby, sbwidth, bottompaddingsb, RGB(0,0,0))
             DrawingMode(#PB_2DDrawing_Transparent)
           EndIf
           
-          FormWindows()\FormToolbars()\x1 = toolx
-          FormWindows()\FormToolbars()\x2 = toolx + 16
-          FormWindows()\FormToolbars()\y = tooly
-          
-          toolx + 16 + 6
-        EndIf
-      Next
-      FormWindows()\toolbar_buttonx = toolx
-      FormWindows()\toolbar_buttony = tooly
-      
-      DrawingMode(#PB_2DDrawing_AlphaBlend | #PB_2DDrawing_Transparent)
-      DrawImage(ImageID(#Img_Plus),toolx,tooly)
-      DrawingMode(#PB_2DDrawing_Transparent)
-    EndIf ;}
-    
-    ;{ Draw Status Bar
-    If bottompaddingsb
-      Select FormSkin ;{
-        Case #PB_OS_MacOS
-          sbx = #Page_Padding - FormWindows()\paddingx + 7
-          sby = #Page_Padding - FormWindows()\paddingy + topmenupadding + topwinpadding + toptoolpadding + FormWindows()\height - bottompaddingsb
-          
-          DrawingMode(#PB_2DDrawing_Transparent)
-          Line(sbx - 7,sby,FormWindows()\width,1,RGB(184,184,184))
-          
-          DrawingMode(#PB_2DDrawing_Gradient)
-          BackColor(RGB(211,211,211))
-          FrontColor(RGB(1171,171,171))
-          LinearGradient(sbx,sby,sbx,sby+23)
-          
-          RoundBox(#Page_Padding,sby,FormWindows()\width,bottompaddingsb,3,3)
-          
-          DrawingMode(#PB_2DDrawing_Transparent)
-          Line(sbx - 7,sby,FormWindows()\width,1,RGB(118,118,118))
-          DrawingFont(FontID(#Form_Font))
-        Case #PB_OS_Windows
-          sbx = #Page_Padding - FormWindows()\paddingx + 8 + 7
-          sby = #Page_Padding - FormWindows()\paddingy + topwinpadding + FormWindows()\height - bottompaddingsb
-          
-          DrawingMode(#PB_2DDrawing_Transparent)
-          Line(sbx - 7,sby,FormWindows()\width,1,RGB(145,145,145))
-        Case #PB_OS_Linux
-          sbx = #Page_Padding - FormWindows()\paddingx + 8 + 7
-          sby = #Page_Padding - FormWindows()\paddingy + topwinpadding + FormWindows()\height - bottompaddingsb
-          
-          DrawingMode(#PB_2DDrawing_Transparent)
-          Line(sbx - 8 - 7,sby,FormWindows()\width,1,RGB(145,145,145))
-      EndSelect ;}
-      
-      ; if #pb_ignore is used, calculate the width of those fields
-      sbcountignore = 0
-      sbcountwidth = 0
-      ForEach FormWindows()\FormStatusbars()
-        If FormWindows()\FormStatusbars()\width = -1
-          sbcountignore + 1
-        Else
-          sbcountwidth + FormWindows()\FormStatusbars()\width
-        EndIf
-      Next
-      sbremainingwidth = FormWindows()\width - 14 - sbcountwidth
-      
-      ForEach FormWindows()\FormStatusbars()
-        If FormWindows()\FormStatusbars()\width > -1
-          sbwidth = FormWindows()\FormStatusbars()\width
-        Else
-          sbwidth = sbremainingwidth / sbcountignore
-        EndIf
-        
-        If propgrid_statusbar = FormWindows()\FormStatusbars()
-          DrawingMode(#PB_2DDrawing_Outlined)
-          Box(sbx, sby, sbwidth, bottompaddingsb, RGB(0,0,0))
-          DrawingMode(#PB_2DDrawing_Transparent)
-        EndIf
-        
-        If statusdragpos
-          If statusdragpos > FormWindows()\FormStatusbars()\x1 - 5 And statusdragpos < (FormWindows()\FormStatusbars()\x2 - 5)
-            Line(sbx - 1, sby, 1, 16, RGB(0,0,255))
-            Line(sbx, sby, 1, 16, RGB(0,0,255))
-          ElseIf ListIndex(FormWindows()\FormStatusbars()) = ListSize(FormWindows()\FormStatusbars()) -1 And statusdragpos > FormWindows()\FormStatusbars()\x1
-            Line(sbx + sbwidth, sby, 1, 16, RGB(0,0,255))
-            Line(sbx + sbwidth + 1, sby, 1, 16, RGB(0,0,255))
-          EndIf
-        EndIf
-        
-        If FormWindows()\FormStatusbars()\text <> ""
-          DrawingMode(#PB_2DDrawing_Transparent)
-          
-          If FormWindows()\FormStatusbars()\flags & FlagValue("#PB_StatusBar_Center")
-            DrawText(sbx + (sbwidth - TextWidth(FormWindows()\FormStatusbars()\text))/2,sby+4,FormWindows()\FormStatusbars()\text,RGB(0,0,0))
-          ElseIf FormWindows()\FormStatusbars()\flags & FlagValue("#PB_StatusBar_Right")
-            DrawText(sbx + sbwidth - TextWidth(FormWindows()\FormStatusbars()\text),sby+4,FormWindows()\FormStatusbars()\text,RGB(0,0,0))
-          Else
-            DrawText(sbx,sby+4,FormWindows()\FormStatusbars()\text,RGB(0,0,0))
-          EndIf
-        ElseIf FormWindows()\FormStatusbars()\progressbar
-          x1 = sbx
-          y1 = sby + 5
-          x2 = sbx + sbwidth
-          y2 = sby + 23 - 5
-          
-          DrawingMode(#PB_2DDrawing_Transparent)
-          If FormSkin = #PB_OS_Windows And FormSkinVersion = 8
-            color = RGB(230,230,230)
-          Else
-            color = RGB(220,220,220)
+          If statusdragpos
+            If statusdragpos > FormWindows()\FormStatusbars()\x1 - 5 And statusdragpos < (FormWindows()\FormStatusbars()\x2 - 5)
+              Line(sbx - 1, sby, 1, 16, RGB(0,0,255))
+              Line(sbx, sby, 1, 16, RGB(0,0,255))
+            ElseIf ListIndex(FormWindows()\FormStatusbars()) = ListSize(FormWindows()\FormStatusbars()) -1 And statusdragpos > FormWindows()\FormStatusbars()\x1
+              Line(sbx + sbwidth, sby, 1, 16, RGB(0,0,255))
+              Line(sbx + sbwidth + 1, sby, 1, 16, RGB(0,0,255))
+            EndIf
           EndIf
           
-          If FormSkin = #PB_OS_Windows And FormSkinVersion = 8
-            Box(x1,y1,x2 - x1, y2 - y1,color)
-          Else
-            RoundBox(x1,y1,x2 - x1, y2 - y1,3,3,color)
-          EndIf
-          
-          If FormSkin = #PB_OS_Windows And FormSkinVersion = 8
-            color = RGB(6,176,37)
-          Else
-            color = RGB(134,206,244)
-          EndIf
-          
-          Box(x1 + 1, y1 + 1, (x2 - x1) / 2 - 2, y2 - y1 - 2,color)
-          
-          DrawingMode(#PB_2DDrawing_Outlined)
-          If FormSkin = #PB_OS_Windows And FormSkinVersion = 8
-            Box(x1,y1,x2 - x1, y2 - y1,RGB(188,188,188))
-          Else
-            RoundBox(x1,y1,x2 - x1, y2 - y1,3,3,RGB(152,152,152))
-          EndIf
-        Else
-          If FormWindows()\FormStatusbars()\img
-            ChangeCurrentElement(FormWindows()\FormImg(),FormWindows()\FormStatusbars()\img)
-            img = ImageManager(FormWindows()\FormImg()\img)
-          Else
-            img = #IMAGE_FormIcons_Image
-          EndIf
-          
-          If IsImage(img)
+          If FormWindows()\FormStatusbars()\text <> ""
+            DrawingMode(#PB_2DDrawing_Transparent)
+            
             If FormWindows()\FormStatusbars()\flags & FlagValue("#PB_StatusBar_Center")
-              toolx = sbx + (sbwidth - ImageWidth(img))/2
-              tooly = sby + 4
+              DrawText(sbx + (sbwidth - TextWidth(FormWindows()\FormStatusbars()\text))/2,sby+4,FormWindows()\FormStatusbars()\text,RGB(0,0,0))
             ElseIf FormWindows()\FormStatusbars()\flags & FlagValue("#PB_StatusBar_Right")
-              toolx = sbx + sbwidth - ImageWidth(img)
-              tooly = sby + 4
+              DrawText(sbx + sbwidth - TextWidth(FormWindows()\FormStatusbars()\text),sby+4,FormWindows()\FormStatusbars()\text,RGB(0,0,0))
             Else
-              toolx = sbx
-              tooly = sby + 4
+              DrawText(sbx,sby+4,FormWindows()\FormStatusbars()\text,RGB(0,0,0))
+            EndIf
+          ElseIf FormWindows()\FormStatusbars()\progressbar
+            x1 = sbx
+            y1 = sby + 5
+            x2 = sbx + sbwidth
+            y2 = sby + 23 - 5
+            
+            DrawingMode(#PB_2DDrawing_Transparent)
+            If FormSkin = #PB_OS_Windows And FormSkinVersion = 8
+              color = RGB(230,230,230)
+            Else
+              color = RGB(220,220,220)
             EndIf
             
-            If ImageDepth(img) = 32
-              DrawingMode(#PB_2DDrawing_AlphaBlend | #PB_2DDrawing_Transparent)
+            If FormSkin = #PB_OS_Windows And FormSkinVersion = 8
+              Box(x1,y1,x2 - x1, y2 - y1,color)
             Else
+              RoundBox(x1,y1,x2 - x1, y2 - y1,3,3,color)
+            EndIf
+            
+            If FormSkin = #PB_OS_Windows And FormSkinVersion = 8
+              color = RGB(6,176,37)
+            Else
+              color = RGB(134,206,244)
+            EndIf
+            
+            Box(x1 + 1, y1 + 1, (x2 - x1) / 2 - 2, y2 - y1 - 2,color)
+            
+            DrawingMode(#PB_2DDrawing_Outlined)
+            If FormSkin = #PB_OS_Windows And FormSkinVersion = 8
+              Box(x1,y1,x2 - x1, y2 - y1,RGB(188,188,188))
+            Else
+              RoundBox(x1,y1,x2 - x1, y2 - y1,3,3,RGB(152,152,152))
+            EndIf
+          Else
+            If FormWindows()\FormStatusbars()\img
+              ChangeCurrentElement(FormWindows()\FormImg(),FormWindows()\FormStatusbars()\img)
+              img = ImageManager(FormWindows()\FormImg()\img)
+            Else
+              img = #IMAGE_FormIcons_Image
+            EndIf
+            
+            If IsImage(img)
+              If FormWindows()\FormStatusbars()\flags & FlagValue("#PB_StatusBar_Center")
+                toolx = sbx + (sbwidth - ImageWidth(img))/2
+                tooly = sby + 4
+              ElseIf FormWindows()\FormStatusbars()\flags & FlagValue("#PB_StatusBar_Right")
+                toolx = sbx + sbwidth - ImageWidth(img)
+                tooly = sby + 4
+              Else
+                toolx = sbx
+                tooly = sby + 4
+              EndIf
+              
+              If ImageDepth(img) = 32
+                DrawingMode(#PB_2DDrawing_AlphaBlend | #PB_2DDrawing_Transparent)
+              Else
+                DrawingMode(#PB_2DDrawing_Transparent)
+              EndIf
+              
+              DrawImage(ImageID(img),toolx,tooly)
               DrawingMode(#PB_2DDrawing_Transparent)
             EndIf
-            
-            DrawImage(ImageID(img),toolx,tooly)
-            DrawingMode(#PB_2DDrawing_Transparent)
-          EndIf
-        EndIf
-        
-        FormWindows()\FormStatusbars()\x1 = sbx
-        FormWindows()\FormStatusbars()\x2 = sbx + sbwidth
-        FormWindows()\FormStatusbars()\y = sby
-        sbx + sbwidth
-        
-        ; draw field separator on windows/linux
-        If FormSkin = #PB_OS_Windows
-          If ListIndex(FormWindows()\FormStatusbars()) < ListSize(FormWindows()\FormStatusbars())-1
-            Line(sbx,sby + 1,1,bottompaddingsb - 1,RGB(215,215,215))
-          EndIf
-        EndIf
-        If FormSkin = #PB_OS_Linux
-          If ListIndex(FormWindows()\FormStatusbars()) < ListSize(FormWindows()\FormStatusbars())-1
-            Line(sbx,sby + 1,1,bottompaddingsb - 1,RGB(215,215,215))
-          EndIf
-        EndIf
-      Next
-      
-      DrawingMode(#PB_2DDrawing_AlphaBlend | #PB_2DDrawing_Transparent)
-      DrawImage(ImageID(#Img_Plus),sbx,sby + 4)
-      DrawingMode(#PB_2DDrawing_Transparent)
-      FormWindows()\status_buttonx = sbx
-      FormWindows()\status_buttony = sby
-    EndIf ;}
-    
-    ;{ Draw final window border on Mac
-    If FormSkin = #PB_OS_MacOS
-      DrawingMode(#PB_2DDrawing_Outlined)
-      RoundBox(#Page_Padding - FormWindows()\paddingx - 1,#Page_Padding - 1 - FormWindows()\paddingy + topmenupadding,FormWindows()\width + 2,FormWindows()\height + 2 + topwinpadding + toptoolpadding, 4,4,RGB(118,118,118))
-      DrawingMode(#PB_2DDrawing_Transparent)
-    EndIf ;}
-    
-    ;{ draw all gadgets. messy code to check if the gadget is visible (esp. when parent is a panel or scrollarea)
-    ForEach FormWindows()\FormGadgets()
-      If Not FormWindows()\FormGadgets()\hidden
-        this_parent = FormWindows()\FormGadgets()\parent
-        this_parent_item = FormWindows()\FormGadgets()\parent_item
-        x1 = 0 : x2 = 0 : y1 = 0 : y2 = 0
-        xmin = 0 : xmax = FormWindows()\width : ymin = 0 : ymax = FormWindows()\height
-        scrollx = 0 : scrolly = 0
-        
-        oldparent = this_parent
-        dontdraw = 0
-        While this_parent <> 0
-          PushListPosition(FormWindows()\FormGadgets())
-          FD_FindParent(this_parent)
-          
-          x1 + FormWindows()\FormGadgets()\x1 - FormWindows()\FormGadgets()\scrollx
-          x2 + FormWindows()\FormGadgets()\x1 - FormWindows()\FormGadgets()\scrollx
-          y1 + FormWindows()\FormGadgets()\y1 - FormWindows()\FormGadgets()\scrolly
-          y2 + FormWindows()\FormGadgets()\y1 - FormWindows()\FormGadgets()\scrolly
-          
-          If this_parent <> oldparent
-            scrollx + FormWindows()\FormGadgets()\scrollx
-            scrolly + FormWindows()\FormGadgets()\scrolly
           EndIf
           
-          If FormWindows()\FormGadgets()\x1 > 0
-            xmin + FormWindows()\FormGadgets()\x1
-          EndIf
+          FormWindows()\FormStatusbars()\x1 = sbx
+          FormWindows()\FormStatusbars()\x2 = sbx + sbwidth
+          FormWindows()\FormStatusbars()\y = sby
+          sbx + sbwidth
           
-          If FormWindows()\FormGadgets()\type = #Form_Type_Panel And FormWindows()\FormGadgets()\y1 + Panel_Height > 0
-            ymin + FormWindows()\FormGadgets()\y1 + Panel_Height
-          ElseIf FormWindows()\FormGadgets()\y1 > 0
-            ymin + FormWindows()\FormGadgets()\y1
-          EndIf
-          
-          If FormWindows()\FormGadgets()\hidden
-            dontdraw = 1
-          EndIf
-          
-          If FormWindows()\FormGadgets()\type = #Form_Type_Panel
-            y1 + Panel_Height
-            y2 + Panel_Height
-            
-            If this_parent_item <> FormWindows()\FormGadgets()\current_item ; the item is not currently displayed, don't draw the gadget
-              dontdraw = 1
+          ; draw field separator on windows/linux
+          If FormSkin = #PB_OS_Windows
+            If ListIndex(FormWindows()\FormStatusbars()) < ListSize(FormWindows()\FormStatusbars())-1
+              Line(sbx,sby + 1,1,bottompaddingsb - 1,RGB(215,215,215))
             EndIf
           EndIf
+          If FormSkin = #PB_OS_Linux
+            If ListIndex(FormWindows()\FormStatusbars()) < ListSize(FormWindows()\FormStatusbars())-1
+              Line(sbx,sby + 1,1,bottompaddingsb - 1,RGB(215,215,215))
+            EndIf
+          EndIf
+        Next
+        
+        DrawingMode(#PB_2DDrawing_AlphaBlend | #PB_2DDrawing_Transparent)
+        DrawImage(ImageID(#Img_Plus),sbx,sby + 4)
+        DrawingMode(#PB_2DDrawing_Transparent)
+        FormWindows()\status_buttonx = sbx
+        FormWindows()\status_buttony = sby
+      EndIf ;}
+      
+      ;{ Draw final window border on Mac
+      If FormSkin = #PB_OS_MacOS
+        DrawingMode(#PB_2DDrawing_Outlined)
+        RoundBox(#Page_Padding - FormWindows()\paddingx - 1,#Page_Padding - 1 - FormWindows()\paddingy + topmenupadding,FormWindows()\width + 2,FormWindows()\height + 2 + topwinpadding + toptoolpadding, 4,4,RGB(118,118,118))
+        DrawingMode(#PB_2DDrawing_Transparent)
+      EndIf ;}
+      
+      ;{ draw all gadgets. messy code to check if the gadget is visible (esp. when parent is a panel or scrollarea)
+      ForEach FormWindows()\FormGadgets()
+        If Not FormWindows()\FormGadgets()\hidden
           this_parent = FormWindows()\FormGadgets()\parent
           this_parent_item = FormWindows()\FormGadgets()\parent_item
-          PopListPosition(FormWindows()\FormGadgets())
-        Wend
-        
-        If FormWindows()\FormGadgets()\parent
-          PushListPosition(FormWindows()\FormGadgets())
-          FD_FindParent(FormWindows()\FormGadgets()\parent)
+          x1 = 0 : x2 = 0 : y1 = 0 : y2 = 0
+          xmin = 0 : xmax = FormWindows()\width : ymin = 0 : ymax = FormWindows()\height
+          scrollx = 0 : scrolly = 0
           
-          xmax + xmin + FormWindows()\FormGadgets()\x2 - FormWindows()\FormGadgets()\x1
-          If x1 - xmin < 0
-            xmax + x1 -  xmin
-          EndIf
+          oldparent = this_parent
+          dontdraw = 0
+          While this_parent <> 0
+            PushListPosition(FormWindows()\FormGadgets())
+            FD_FindParent(this_parent)
+            
+            x1 + FormWindows()\FormGadgets()\x1 - FormWindows()\FormGadgets()\scrollx
+            x2 + FormWindows()\FormGadgets()\x1 - FormWindows()\FormGadgets()\scrollx
+            y1 + FormWindows()\FormGadgets()\y1 - FormWindows()\FormGadgets()\scrolly
+            y2 + FormWindows()\FormGadgets()\y1 - FormWindows()\FormGadgets()\scrolly
+            
+            If this_parent <> oldparent
+              scrollx + FormWindows()\FormGadgets()\scrollx
+              scrolly + FormWindows()\FormGadgets()\scrolly
+            EndIf
+            
+            If FormWindows()\FormGadgets()\x1 > 0
+              xmin + FormWindows()\FormGadgets()\x1
+            EndIf
+            
+            If FormWindows()\FormGadgets()\type = #Form_Type_Panel And FormWindows()\FormGadgets()\y1 + Panel_Height > 0
+              ymin + FormWindows()\FormGadgets()\y1 + Panel_Height
+            ElseIf FormWindows()\FormGadgets()\y1 > 0
+              ymin + FormWindows()\FormGadgets()\y1
+            EndIf
+            
+            If FormWindows()\FormGadgets()\hidden
+              dontdraw = 1
+            EndIf
+            
+            If FormWindows()\FormGadgets()\type = #Form_Type_Panel
+              y1 + Panel_Height
+              y2 + Panel_Height
+              
+              If this_parent_item <> FormWindows()\FormGadgets()\current_item ; the item is not currently displayed, don't draw the gadget
+                dontdraw = 1
+              EndIf
+            EndIf
+            this_parent = FormWindows()\FormGadgets()\parent
+            this_parent_item = FormWindows()\FormGadgets()\parent_item
+            PopListPosition(FormWindows()\FormGadgets())
+          Wend
           
-          ymax + ymin + FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1
-          If y1 - ymin < 0
-            ymax + y1 - ymin
-          EndIf
-          
-          ymin - scrolly
-          xmin - scrollx
-          
-          If FormWindows()\FormGadgets()\type = #Form_Type_ScrollArea
-            xmax - P_ScrollWidth
-            ymax - P_ScrollWidth
-          EndIf
-          
-          PopListPosition(FormWindows()\FormGadgets())
-        EndIf
-        
-        this_parent = FormWindows()\FormGadgets()\parent
-        While this_parent <> 0
-          PushListPosition(FormWindows()\FormGadgets())
-          FD_FindParent(this_parent)
-          
-          x1gadget = FD_GetGadgetXY(this_parent,2)
-          y1gadget = FD_GetGadgetXY(this_parent,3)
-          x2gadget = FD_GetGadgetXY(this_parent,0)
-          y2gadget = FD_GetGadgetXY(this_parent,1)
-          
-          If ymin < y1gadget
-            ymin = y1gadget
-          EndIf
-          If xmin < x1gadget
-            xmin = x1gadget
-          EndIf
-          If xmax > x2gadget
-            xmax = x2gadget
-          EndIf
-          If ymax > y2gadget
-            ymax = y2gadget
+          If FormWindows()\FormGadgets()\parent
+            PushListPosition(FormWindows()\FormGadgets())
+            FD_FindParent(FormWindows()\FormGadgets()\parent)
+            
+            xmax + xmin + FormWindows()\FormGadgets()\x2 - FormWindows()\FormGadgets()\x1
+            If x1 - xmin < 0
+              xmax + x1 -  xmin
+            EndIf
+            
+            ymax + ymin + FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1
+            If y1 - ymin < 0
+              ymax + y1 - ymin
+            EndIf
+            
+            ymin - scrolly
+            xmin - scrollx
+            
+            If FormWindows()\FormGadgets()\type = #Form_Type_ScrollArea
+              xmax - P_ScrollWidth
+              ymax - P_ScrollWidth
+            EndIf
+            
+            PopListPosition(FormWindows()\FormGadgets())
           EndIf
           
           this_parent = FormWindows()\FormGadgets()\parent
-          PopListPosition(FormWindows()\FormGadgets())
-        Wend
-        
-        If FormWindows()\FormGadgets()\parent
-          PushListPosition(FormWindows()\FormGadgets())
-          FD_FindParent(FormWindows()\FormGadgets()\parent)
+          While this_parent <> 0
+            PushListPosition(FormWindows()\FormGadgets())
+            FD_FindParent(this_parent)
+            
+            x1gadget = FD_GetGadgetXY(this_parent,2)
+            y1gadget = FD_GetGadgetXY(this_parent,3)
+            x2gadget = FD_GetGadgetXY(this_parent,0)
+            y2gadget = FD_GetGadgetXY(this_parent,1)
+            
+            If ymin < y1gadget
+              ymin = y1gadget
+            EndIf
+            If xmin < x1gadget
+              xmin = x1gadget
+            EndIf
+            If xmax > x2gadget
+              xmax = x2gadget
+            EndIf
+            If ymax > y2gadget
+              ymax = y2gadget
+            EndIf
+            
+            this_parent = FormWindows()\FormGadgets()\parent
+            PopListPosition(FormWindows()\FormGadgets())
+          Wend
           
-          If FormWindows()\FormGadgets()\type = #Form_Type_ScrollArea
-            xmax - P_ScrollWidth
-            ymax - P_ScrollWidth
+          If FormWindows()\FormGadgets()\parent
+            PushListPosition(FormWindows()\FormGadgets())
+            FD_FindParent(FormWindows()\FormGadgets()\parent)
+            
+            If FormWindows()\FormGadgets()\type = #Form_Type_ScrollArea
+              xmax - P_ScrollWidth
+              ymax - P_ScrollWidth
+            EndIf
+            
+            PopListPosition(FormWindows()\FormGadgets())
           EndIf
           
-          PopListPosition(FormWindows()\FormGadgets())
-        EndIf
-        
-        If Not dontdraw
-          x1 + FormWindows()\FormGadgets()\x1 - FormWindows()\paddingx + #Page_Padding + leftpadding
-          x2 + FormWindows()\FormGadgets()\x2 - FormWindows()\paddingx + #Page_Padding + leftpadding
-          y1 + FormWindows()\FormGadgets()\y1 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding
-          y2 + FormWindows()\FormGadgets()\y2 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding
-          
-          xmin - FormWindows()\paddingx + #Page_Padding + leftpadding
-          xmax - FormWindows()\paddingx + #Page_Padding + leftpadding
-          ymin - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding
-          ymax - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding
-          
-          If FD_DrawGadget(x1,y1,x2,y2,FormWindows()\FormGadgets()\type,FormWindows()\FormGadgets()\caption, FormWindows()\FormGadgets()\flags, FormWindows()\FormGadgets()\g_data, ListSize( FormWindows()\FormGadgets()\Items()),FormWindows()\FormGadgets())
+          If Not dontdraw
+            x1 + FormWindows()\FormGadgets()\x1 - FormWindows()\paddingx + #Page_Padding + leftpadding
+            x2 + FormWindows()\FormGadgets()\x2 - FormWindows()\paddingx + #Page_Padding + leftpadding
+            y1 + FormWindows()\FormGadgets()\y1 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding
+            y2 + FormWindows()\FormGadgets()\y2 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding
             
-            ; if selected, draw the border/resize
-            If FormWindows()\FormGadgets()\selected
-              DrawingMode(#PB_2DDrawing_Outlined)
-              If FormWindows()\FormGadgets()\splitter
-                Box(x1 + 1,y1 + 1,x2 - x1 - 2, y2 - y1 - 2,RGB(108, 121, 230))
-              Else
-                Box(x1,y1,x2 - x1, y2 - y1,RGB(0,0,0))
-              EndIf
+            xmin - FormWindows()\paddingx + #Page_Padding + leftpadding
+            xmax - FormWindows()\paddingx + #Page_Padding + leftpadding
+            ymin - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding
+            ymax - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding
+            
+            If FD_DrawGadget(x1,y1,x2,y2,FormWindows()\FormGadgets()\type,FormWindows()\FormGadgets()\caption, FormWindows()\FormGadgets()\flags, FormWindows()\FormGadgets()\g_data, ListSize( FormWindows()\FormGadgets()\Items()),FormWindows()\FormGadgets())
               
-              If Not FormWindows()\FormGadgets()\splitter
-                DrawingMode(#PB_2DDrawing_Transparent)
-                FD_DrawResizeButton(x1,y1)
-                FD_DrawResizeButton(x2,y1)
-                FD_DrawResizeButton(x1,y2)
-                FD_DrawResizeButton(x2,y2)
-                FD_DrawResizeButton((x1 + x2)/2,y1)
-                FD_DrawResizeButton((x1 + x2)/2,y2)
-                FD_DrawResizeButton(x1,(y1 + y2)/2)
-                FD_DrawResizeButton(x2,(y1 + y2)/2)
-              EndIf
-            EndIf
-          EndIf
-        EndIf
-      EndIf
-    Next ;}
-    
-    ;{ draw the new gadget if applicable
-    If drawing And d_x2 > d_x1 And d_y2 > d_y1
-      xmin = 0 : xmax = 9999 : ymin = 0 : ymax = 9999
-      Select FormSkin
-        Case #PB_OS_MacOS
-          DrawSuccess = FD_DrawGadget(d_x1 - FormWindows()\paddingx + #Page_Padding,d_y1 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding,d_x2 - FormWindows()\paddingx + #Page_Padding,d_y2 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding,form_gadget_type)
-        Case #PB_OS_Windows
-          DrawSuccess = FD_DrawGadget(d_x1 + leftpadding - FormWindows()\paddingx + #Page_Padding,d_y1 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding,d_x2 - FormWindows()\paddingx + #Page_Padding + leftpadding,d_y2 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding,form_gadget_type)
-        Case #PB_OS_Linux
-          DrawSuccess = FD_DrawGadget(d_x1 + leftpadding - FormWindows()\paddingx + #Page_Padding,d_y1 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding,d_x2 - FormWindows()\paddingx + #Page_Padding + leftpadding,d_y2 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding,form_gadget_type)
-      EndSelect
-      
-      If DrawSuccess
-        DrawingMode(#PB_2DDrawing_Outlined)
-        Box(d_x1 + leftpadding - FormWindows()\paddingx + #Page_Padding, d_y1 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding, d_x2 - d_x1, d_y2 - d_y1,RGB(0,0,0))
-      EndIf
-    EndIf ;}
-    
-    ;{ Draw menu
-    Select FormSkin ;{
-      Case #PB_OS_MacOS
-        DrawingMode(#PB_2DDrawing_Transparent)
-        Line(0,0,OutputWidth(),1,RGB(85,85,85))
-        If ListSize(FormWindows()\FormMenus()) Or FormWindows()\menu_visible
-          DrawingMode(#PB_2DDrawing_Gradient)
-          BackColor(RGB(251,251,251))
-          FrontColor(RGB(218,218,218))
-          LinearGradient(0,1,0,22)
-          Box(0,1,OutputWidth(),21)
-          DrawingMode(#PB_2DDrawing_Transparent)
-          Line(0,22,OutputWidth(),1,RGB(118,118,118))
-          menux = 20
-          menuy = 4
-          menuspace = 20
-        EndIf
-      Case #PB_OS_Windows
-        If ListSize(FormWindows()\FormMenus()) Or FormWindows()\menu_visible
-          DrawingMode(#PB_2DDrawing_Transparent)
-          Select FormSkinVersion
-            Case 7
-              Box(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding,FormWindows()\width,7,RGB(245,245,245))
-              Box(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding + 7,FormWindows()\width,11,RGB(218,224,241))
-              Line(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding + 19,FormWindows()\width,1,RGB(182,188,204))
-              Line(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding + 20,FormWindows()\width,1,RGB(240,240,240))
-              Line(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding + 21,FormWindows()\width,1,RGB(160,160,160))
-            Case 8
-              Box(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding,FormWindows()\width,21,RGB(245,246,247))
-              Line(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding + 21,FormWindows()\width,1,RGB(232,233,234))
-          EndSelect
-          
-          menux = #Page_Padding - FormWindows()\paddingx + 8 + 7
-          menuy = #Page_Padding - FormWindows()\paddingy + topwinpadding + 2
-          menuspace = 7
-        EndIf
-        
-      Case #PB_OS_Linux
-        If ListSize(FormWindows()\FormMenus()) Or FormWindows()\menu_visible
-          DrawingMode(#PB_2DDrawing_Transparent)
-          Box(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topwinpadding,FormWindows()\width,topmenupadding - 1,RGB(245,246,247))
-          Line(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topwinpadding + topmenupadding - 1,FormWindows()\width,1,RGB(232,233,234))
-          
-          menux = #Page_Padding - FormWindows()\paddingx + 8 + 7
-          menuy = #Page_Padding - FormWindows()\paddingy + topwinpadding + 2
-          menuspace = 7
-        EndIf
-        
-    EndSelect ;}
-    
-    DrawingMode(#PB_2DDrawing_Transparent)
-    DrawingFont(FontID(#Form_FontMenu))
-    
-    If propgrid_menu
-      NewList items.i()
-      
-      ChangeCurrentElement(FormWindows()\FormMenus(),propgrid_menu)
-      AddElement(items()) : items() = FormWindows()\FormMenus()
-      
-      level = FormWindows()\FormMenus()\level
-      If level
-        Repeat
-          PreviousElement(FormWindows()\FormMenus())
-          If FormWindows()\FormMenus()\level < level
-            AddElement(items()) : items() = FormWindows()\FormMenus()
-            level = FormWindows()\FormMenus()\level
-          EndIf
-        Until level = 0
-      EndIf
-    EndIf
-    
-    ForEach FormWindows()\FormMenus()
-      FormWindows()\FormMenus()\x1 = 0
-      FormWindows()\FormMenus()\x2 = 0
-      FormWindows()\FormMenus()\y1 = 0
-      FormWindows()\FormMenus()\y2 = 0
-    Next
-    ClearList(FormWindows()\FormMenuButtons())
-    
-    ForEach FormWindows()\FormMenus()
-      If FormWindows()\FormMenus()\level = 0
-        FormWindows()\FormMenus()\x1 = menux
-        FormWindows()\FormMenus()\y1 = menuy
-        menux = DrawText(menux,menuy,FormWindows()\FormMenus()\item,RGB(0,0,0))
-        menux + menuspace
-        FormWindows()\FormMenus()\y2 = menuy + TextHeight(FormWindows()\FormMenus()\item)
-        FormWindows()\FormMenus()\x2 = menux
-        
-        If propgrid_menu = FormWindows()\FormMenus()
-          DrawingMode(#PB_2DDrawing_Outlined)
-          Box(FormWindows()\FormMenus()\x1 - 1, FormWindows()\FormMenus()\y1 - 1, FormWindows()\FormMenus()\x2 - FormWindows()\FormMenus()\x1 , FormWindows()\FormMenus()\y2 - FormWindows()\FormMenus()\y1 + 2, RGB(0,0,0))
-          DrawingMode(#PB_2DDrawing_Transparent)
-        EndIf
-      EndIf
-    Next
-    
-    If ListSize(FormWindows()\FormMenus()) Or FormWindows()\menu_visible
-      FormWindows()\menu_buttonx = menux
-      FormWindows()\menu_buttony = menuy
-      DrawingMode(#PB_2DDrawing_AlphaBlend | #PB_2DDrawing_Transparent)
-      DrawImage(ImageID(#Img_Plus),menux,menuy)
-      DrawingMode(#PB_2DDrawing_Transparent)
-    EndIf
-    
-    If propgrid_menu And ListSize(items()) >= 1
-      LastElement(items())
-      Repeat
-        ChangeCurrentElement(FormWindows()\FormMenus(),items())
-        level = FormWindows()\FormMenus()\level + 1
-        height = 20
-        width = 0
-        
-        Repeat
-          finish = NextElement(FormWindows()\FormMenus())
-          
-          If Not finish
-            Break
-          EndIf
-          
-          If FormWindows()\FormMenus()\level = level
-            textwidth = TextWidth(FormWindows()\FormMenus()\item)
-            
-            If FormWindows()\FormMenus()\shortcut
-              textwidth + TextWidth(FormWindows()\FormMenus()\shortcut)
-            EndIf
-            
-            textwidth + 16 + 8 ; icon
-            
-            If textwidth > width
-              width = textwidth
-            EndIf
-            
-            If FormWindows()\FormMenus()\separator
-              height + 12
-            Else
-              height + 20
-            EndIf
-            
-          EndIf
-          
-        Until FormWindows()\FormMenus()\level < level
-        
-        width + 40
-        
-        If width < 100
-          width = 100
-        EndIf
-        
-        ChangeCurrentElement(FormWindows()\FormMenus(),items())
-        If ListIndex(items()) = ListSize(items()) - 1
-          submenux = FormWindows()\FormMenus()\x1
-          If FormSkin = #PB_OS_MacOS
-            submenuy = menuy - 4 + topmenupadding
-          Else
-            submenuy = menuy - 2 + topmenupadding
-          EndIf
-        Else
-          submenux = nextmenux
-          submenuy = nextmenuy
-        EndIf
-        
-        nextmenux = submenux + width
-        nextmenuy = submenuy
-        
-        PushListPosition(items())
-        nextel = items()
-        If PreviousElement(items())
-          nextel = items()
-        Else
-          nextel = -1
-        EndIf
-        PopListPosition(items())
-        
-        ChangeCurrentElement(FormWindows()\FormMenus(),items())
-        If FormWindows()\FormMenus()\separator
-          Break
-        EndIf
-        
-        DrawingMode(#PB_2DDrawing_Transparent)
-        Box(submenux,submenuy,width,height,RGB(255,255,255))
-        DrawingMode(#PB_2DDrawing_Outlined)
-        Box(submenux,submenuy,width,height,RGB(200,200,200))
-        DrawingMode(#PB_2DDrawing_Transparent)
-        ChangeCurrentElement(FormWindows()\FormMenus(),items())
-        
-        level = FormWindows()\FormMenus()\level + 1
-        posy = submenuy
-        
-        count = 0
-        Repeat
-          previous_el = FormWindows()\FormMenus()
-          finish = NextElement(FormWindows()\FormMenus())
-          
-          If FormWindows()\FormMenus() = nextel
-            nextmenuy = posy
-            
-            If Not finish
-              nextmenuy - 20
-            EndIf
-          EndIf
-          
-          If finish
-            If FormWindows()\FormMenus()\level = level
-              If FormWindows()\FormMenus()\separator
-                Line(submenux,posy + 6,width ,1,RGB(200,200,200))
-                FormWindows()\FormMenus()\x1 = submenux
-                FormWindows()\FormMenus()\x2 = submenux + width
-                FormWindows()\FormMenus()\y1 = posy
-                FormWindows()\FormMenus()\y2 = posy + 12
-                posy + 12
-              Else
-                If FormWindows()\FormMenus()\icon
-                  ChangeCurrentElement(FormWindows()\FormImg(),FormWindows()\FormMenus()\icon)
-                  img = ImageManager(FormWindows()\FormImg()\img)
-                  
-                  If IsImage(img)
-                    If ImageDepth(img) = 32
-                      DrawingMode(#PB_2DDrawing_AlphaBlend | #PB_2DDrawing_Transparent)
-                    Else
-                      DrawingMode(#PB_2DDrawing_Transparent)
-                    EndIf
-                    
-                    DrawImage(ImageID(img),submenux + 3,posy + 2,16,16)
-                    DrawingMode(#PB_2DDrawing_Transparent)
-                  EndIf
-                EndIf
-                
-                DrawText(submenux + 24, posy, FormWindows()\FormMenus()\item,RGB(0,0,0))
-                
-                If FormWindows()\FormMenus()\shortcut
-                  DrawText(submenux + width - 10 - TextWidth(FormWindows()\FormMenus()\shortcut),posy, FormWindows()\FormMenus()\shortcut, RGB(0,0,0))
-                EndIf
-                
-                FormWindows()\FormMenus()\x1 = submenux
-                FormWindows()\FormMenus()\x2 = submenux + width
-                FormWindows()\FormMenus()\y1 = posy
-                FormWindows()\FormMenus()\y2 = posy + 20
-                
-                sub = 0
-                PushListPosition(FormWindows()\FormMenus())
-                If NextElement(FormWindows()\FormMenus())
-                  If FormWindows()\FormMenus()\level > level
-                    sub = 1
-                  EndIf
-                EndIf
-                PopListPosition(FormWindows()\FormMenus())
-                
-                If sub
-                  DrawingMode(#PB_2DDrawing_Transparent | #PB_2DDrawing_AlphaBlend)
-                  DrawImage(ImageID(#Img_MacSubMenu),submenux + width - 20,posy + 4)
-                  DrawingMode(#PB_2DDrawing_Transparent)
-                EndIf
-                
-                posy + 20
-              EndIf
-              
-              If propgrid_menu = FormWindows()\FormMenus()
+              ; if selected, draw the border/resize
+              If FormWindows()\FormGadgets()\selected
                 DrawingMode(#PB_2DDrawing_Outlined)
-                Box(FormWindows()\FormMenus()\x1, FormWindows()\FormMenus()\y1, FormWindows()\FormMenus()\x2 - FormWindows()\FormMenus()\x1 , FormWindows()\FormMenus()\y2 - FormWindows()\FormMenus()\y1, RGB(0,0,0))
-                DrawingMode(#PB_2DDrawing_Transparent)
+                If FormWindows()\FormGadgets()\splitter
+                  Box(x1 + 1,y1 + 1,x2 - x1 - 2, y2 - y1 - 2,RGB(108, 121, 230))
+                Else
+                  Box(x1,y1,x2 - x1, y2 - y1,RGB(0,0,0))
+                EndIf
+                
+                If Not FormWindows()\FormGadgets()\splitter
+                  DrawingMode(#PB_2DDrawing_Transparent)
+                  FD_DrawResizeButton(x1,y1)
+                  FD_DrawResizeButton(x2,y1)
+                  FD_DrawResizeButton(x1,y2)
+                  FD_DrawResizeButton(x2,y2)
+                  FD_DrawResizeButton((x1 + x2)/2,y1)
+                  FD_DrawResizeButton((x1 + x2)/2,y2)
+                  FD_DrawResizeButton(x1,(y1 + y2)/2)
+                  FD_DrawResizeButton(x2,(y1 + y2)/2)
+                EndIf
               EndIf
             EndIf
-          Else
-            Break
           EndIf
-          count + 1
-        Until FormWindows()\FormMenus()\level < level
-        
-        AddElement(FormWindows()\FormMenuButtons())
-        FormWindows()\FormMenuButtons()\x1 = submenux
-        FormWindows()\FormMenuButtons()\x2 = submenux + width
-        FormWindows()\FormMenuButtons()\y1 = posy
-        FormWindows()\FormMenuButtons()\y2 = posy + 20
-        FormWindows()\FormMenuButtons()\level = ListSize(items()) - ListIndex(items())
-        
-        If FormWindows()\FormMenus()\level > 0 And count = 0
-          PreviousElement(FormWindows()\FormMenus())
         EndIf
-        
-        FormWindows()\FormMenuButtons()\previous_el = previous_el
-        DrawText(submenux + 5, posy, "Add Item...",RGB(0,0,0))
-      Until PreviousElement(items()) = 0
-    EndIf
-    
-    If ListSize(FormWindows()\FormMenus())
-      level = 0
-      FirstElement(FormWindows()\FormMenus())
-      menuy2 = FormWindows()\FormMenus()\y2
+      Next ;}
       
-      ForEach FormWindows()\FormMenus()
-        ; drag before the first menu title
-        If ListIndex(FormWindows()\FormMenus()) = 0 And menudragposx <= FormWindows()\FormMenus()\x1 And menudragposy >= FormWindows()\FormMenus()\y1 And menudragposy < FormWindows()\FormMenus()\y2
-          Line(FormWindows()\FormMenus()\x1 - 1, FormWindows()\FormMenus()\y1, 1, 16, RGB(0,0,255))
-          Line(FormWindows()\FormMenus()\x1, FormWindows()\FormMenus()\y1, 1, 16, RGB(0,0,255))
-        EndIf
+      ;{ draw the new gadget if applicable
+      If drawing And d_x2 > d_x1 And d_y2 > d_y1
+        xmin = 0 : xmax = 9999 : ymin = 0 : ymax = 9999
+        Select FormSkin
+          Case #PB_OS_MacOS
+            DrawSuccess = FD_DrawGadget(d_x1 - FormWindows()\paddingx + #Page_Padding,d_y1 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding,d_x2 - FormWindows()\paddingx + #Page_Padding,d_y2 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding,form_gadget_type)
+          Case #PB_OS_Windows
+            DrawSuccess = FD_DrawGadget(d_x1 + leftpadding - FormWindows()\paddingx + #Page_Padding,d_y1 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding,d_x2 - FormWindows()\paddingx + #Page_Padding + leftpadding,d_y2 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding,form_gadget_type)
+          Case #PB_OS_Linux
+            DrawSuccess = FD_DrawGadget(d_x1 + leftpadding - FormWindows()\paddingx + #Page_Padding,d_y1 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding,d_x2 - FormWindows()\paddingx + #Page_Padding + leftpadding,d_y2 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding,form_gadget_type)
+        EndSelect
         
-        ; drag before the first menu item
-        If FormWindows()\FormMenus()\level > level And menudragposy >= FormWindows()\FormMenus()\y1 - 1 And menudragposy < FormWindows()\FormMenus()\y1 + 1 And menudragposx > FormWindows()\FormMenus()\x1 And menudragposx <= FormWindows()\FormMenus()\x2
-          Line(FormWindows()\FormMenus()\x1, FormWindows()\FormMenus()\y1 - 1, FormWindows()\FormMenus()\x2 - FormWindows()\FormMenus()\x1, 1, RGB(0,0,255))
-          Line(FormWindows()\FormMenus()\x1, FormWindows()\FormMenus()\y1, FormWindows()\FormMenus()\x2 - FormWindows()\FormMenus()\x1, 1, RGB(0,0,255))
+        If DrawSuccess
+          DrawingMode(#PB_2DDrawing_Outlined)
+          Box(d_x1 + leftpadding - FormWindows()\paddingx + #Page_Padding, d_y1 - FormWindows()\paddingy + #Page_Padding + topwinpadding + toptoolpadding + topmenupadding, d_x2 - d_x1, d_y2 - d_y1,RGB(0,0,0))
         EndIf
-        
-        If menudragposx > FormWindows()\FormMenus()\x1 And menudragposx <= FormWindows()\FormMenus()\x2 And menudragposy > FormWindows()\FormMenus()\y1 + 1 And menudragposy <= FormWindows()\FormMenus()\y2
-          If FormWindows()\FormMenus()\level = 0
-            Line(FormWindows()\FormMenus()\x2, FormWindows()\FormMenus()\y1, 1, 16, RGB(0,0,255))
-            Line(FormWindows()\FormMenus()\x2 + 1, FormWindows()\FormMenus()\y1, 1, 16, RGB(0,0,255))
-          Else
-            Line(FormWindows()\FormMenus()\x1, FormWindows()\FormMenus()\y2, FormWindows()\FormMenus()\x2 - FormWindows()\FormMenus()\x1, 1, RGB(0,0,255))
-            Line(FormWindows()\FormMenus()\x1, FormWindows()\FormMenus()\y2 + 1, FormWindows()\FormMenus()\x2 - FormWindows()\FormMenus()\x1, 1, RGB(0,0,255))
+      EndIf ;}
+      
+      ;{ Draw menu
+      Select FormSkin ;{
+        Case #PB_OS_MacOS
+          DrawingMode(#PB_2DDrawing_Transparent)
+          Line(0,0,OutputWidth(),1,RGB(85,85,85))
+          If ListSize(FormWindows()\FormMenus()) Or FormWindows()\menu_visible
+            DrawingMode(#PB_2DDrawing_Gradient)
+            BackColor(RGB(251,251,251))
+            FrontColor(RGB(218,218,218))
+            LinearGradient(0,1,0,22)
+            Box(0,1,OutputWidth(),21)
+            DrawingMode(#PB_2DDrawing_Transparent)
+            Line(0,22,OutputWidth(),1,RGB(118,118,118))
+            menux = 20
+            menuy = 4
+            menuspace = 20
           EndIf
-        EndIf
-        
-        If FormWindows()\FormMenus() = propgrid_menu ; move to a new level
-          oldLevel = FormWindows()\FormMenus()\level
-          PushListPosition(FormWindows()\FormMenus())
-          check = 0
-          If NextElement(FormWindows()\FormMenus())
-            If FormWindows()\FormMenus()\level <= oldLevel
-              PreviousElement(FormWindows()\FormMenus())
-              check = 1
-            EndIf
+        Case #PB_OS_Windows
+          If ListSize(FormWindows()\FormMenus()) Or FormWindows()\menu_visible
+            DrawingMode(#PB_2DDrawing_Transparent)
+            Select FormSkinVersion
+              Case 7
+                Box(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding,FormWindows()\width,7,RGB(245,245,245))
+                Box(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding + 7,FormWindows()\width,11,RGB(218,224,241))
+                Line(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding + 19,FormWindows()\width,1,RGB(182,188,204))
+                Line(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding + 20,FormWindows()\width,1,RGB(240,240,240))
+                Line(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding + 21,FormWindows()\width,1,RGB(160,160,160))
+              Case 8
+                Box(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding,FormWindows()\width,21,RGB(245,246,247))
+                Line(#Page_Padding - FormWindows()\paddingx + 8,#Page_Padding - FormWindows()\paddingy + topwinpadding + 21,FormWindows()\width,1,RGB(232,233,234))
+            EndSelect
+            
+            menux = #Page_Padding - FormWindows()\paddingx + 8 + 7
+            menuy = #Page_Padding - FormWindows()\paddingy + topwinpadding + 2
+            menuspace = 7
           EndIf
           
-          ; move to an empty opened submenu
-          If check And menudragposx > FormWindows()\FormMenus()\x2 And menudragposy > menuy2
-            Line(FormWindows()\FormMenus()\x2, FormWindows()\FormMenus()\y1, 100, 1, RGB(0,0,255))
-            Line(FormWindows()\FormMenus()\x2, FormWindows()\FormMenus()\y1 + 1, 100, 1, RGB(0,0,255))
+        Case #PB_OS_Linux
+          If ListSize(FormWindows()\FormMenus()) Or FormWindows()\menu_visible
+            DrawingMode(#PB_2DDrawing_Transparent)
+            Box(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topwinpadding,FormWindows()\width,topmenupadding - 1,RGB(245,246,247))
+            Line(#Page_Padding - FormWindows()\paddingx,#Page_Padding - FormWindows()\paddingy + topwinpadding + topmenupadding - 1,FormWindows()\width,1,RGB(232,233,234))
+            
+            menux = #Page_Padding - FormWindows()\paddingx + 8 + 7
+            menuy = #Page_Padding - FormWindows()\paddingy + topwinpadding + 2
+            menuspace = 7
           EndIf
-          PopListPosition(FormWindows()\FormMenus())
-        EndIf
+          
+      EndSelect ;}
+      
+      DrawingMode(#PB_2DDrawing_Transparent)
+      DrawingFont(FontID(#Form_FontMenu))
+      
+      If propgrid_menu
+        NewList items.i()
+        
+        ChangeCurrentElement(FormWindows()\FormMenus(),propgrid_menu)
+        AddElement(items()) : items() = FormWindows()\FormMenus()
         
         level = FormWindows()\FormMenus()\level
+        If level
+          Repeat
+            PreviousElement(FormWindows()\FormMenus())
+            If FormWindows()\FormMenus()\level < level
+              AddElement(items()) : items() = FormWindows()\FormMenus()
+              level = FormWindows()\FormMenus()\level
+            EndIf
+          Until level = 0
+        EndIf
+      EndIf
+      
+      ForEach FormWindows()\FormMenus()
+        FormWindows()\FormMenus()\x1 = 0
+        FormWindows()\FormMenus()\x2 = 0
+        FormWindows()\FormMenus()\y1 = 0
+        FormWindows()\FormMenus()\y2 = 0
       Next
-    EndIf
-    
-    
-    ;}
-    
+      ClearList(FormWindows()\FormMenuButtons())
+      
+      ForEach FormWindows()\FormMenus()
+        If FormWindows()\FormMenus()\level = 0
+          FormWindows()\FormMenus()\x1 = menux
+          FormWindows()\FormMenus()\y1 = menuy
+          menux = DrawText(menux,menuy,FormWindows()\FormMenus()\item,RGB(0,0,0))
+          menux + menuspace
+          FormWindows()\FormMenus()\y2 = menuy + TextHeight(FormWindows()\FormMenus()\item)
+          FormWindows()\FormMenus()\x2 = menux
+          
+          If propgrid_menu = FormWindows()\FormMenus()
+            DrawingMode(#PB_2DDrawing_Outlined)
+            Box(FormWindows()\FormMenus()\x1 - 1, FormWindows()\FormMenus()\y1 - 1, FormWindows()\FormMenus()\x2 - FormWindows()\FormMenus()\x1 , FormWindows()\FormMenus()\y2 - FormWindows()\FormMenus()\y1 + 2, RGB(0,0,0))
+            DrawingMode(#PB_2DDrawing_Transparent)
+          EndIf
+        EndIf
+      Next
+      
+      If ListSize(FormWindows()\FormMenus()) Or FormWindows()\menu_visible
+        FormWindows()\menu_buttonx = menux
+        FormWindows()\menu_buttony = menuy
+        DrawingMode(#PB_2DDrawing_AlphaBlend | #PB_2DDrawing_Transparent)
+        DrawImage(ImageID(#Img_Plus),menux,menuy)
+        DrawingMode(#PB_2DDrawing_Transparent)
+      EndIf
+      
+      If propgrid_menu And ListSize(items()) >= 1
+        LastElement(items())
+        Repeat
+          ChangeCurrentElement(FormWindows()\FormMenus(),items())
+          level = FormWindows()\FormMenus()\level + 1
+          height = 20
+          width = 0
+          
+          Repeat
+            finish = NextElement(FormWindows()\FormMenus())
+            
+            If Not finish
+              Break
+            EndIf
+            
+            If FormWindows()\FormMenus()\level = level
+              textwidth = TextWidth(FormWindows()\FormMenus()\item)
+              
+              If FormWindows()\FormMenus()\shortcut
+                textwidth + TextWidth(FormWindows()\FormMenus()\shortcut)
+              EndIf
+              
+              textwidth + 16 + 8 ; icon
+              
+              If textwidth > width
+                width = textwidth
+              EndIf
+              
+              If FormWindows()\FormMenus()\separator
+                height + 12
+              Else
+                height + 20
+              EndIf
+              
+            EndIf
+            
+          Until FormWindows()\FormMenus()\level < level
+          
+          width + 40
+          
+          If width < 100
+            width = 100
+          EndIf
+          
+          ChangeCurrentElement(FormWindows()\FormMenus(),items())
+          If ListIndex(items()) = ListSize(items()) - 1
+            submenux = FormWindows()\FormMenus()\x1
+            If FormSkin = #PB_OS_MacOS
+              submenuy = menuy - 4 + topmenupadding
+            Else
+              submenuy = menuy - 2 + topmenupadding
+            EndIf
+          Else
+            submenux = nextmenux
+            submenuy = nextmenuy
+          EndIf
+          
+          nextmenux = submenux + width
+          nextmenuy = submenuy
+          
+          PushListPosition(items())
+          nextel = items()
+          If PreviousElement(items())
+            nextel = items()
+          Else
+            nextel = -1
+          EndIf
+          PopListPosition(items())
+          
+          ChangeCurrentElement(FormWindows()\FormMenus(),items())
+          If FormWindows()\FormMenus()\separator
+            Break
+          EndIf
+          
+          DrawingMode(#PB_2DDrawing_Transparent)
+          Box(submenux,submenuy,width,height,RGB(255,255,255))
+          DrawingMode(#PB_2DDrawing_Outlined)
+          Box(submenux,submenuy,width,height,RGB(200,200,200))
+          DrawingMode(#PB_2DDrawing_Transparent)
+          ChangeCurrentElement(FormWindows()\FormMenus(),items())
+          
+          level = FormWindows()\FormMenus()\level + 1
+          posy = submenuy
+          
+          count = 0
+          Repeat
+            previous_el = FormWindows()\FormMenus()
+            finish = NextElement(FormWindows()\FormMenus())
+            
+            If FormWindows()\FormMenus() = nextel
+              nextmenuy = posy
+              
+              If Not finish
+                nextmenuy - 20
+              EndIf
+            EndIf
+            
+            If finish
+              If FormWindows()\FormMenus()\level = level
+                If FormWindows()\FormMenus()\separator
+                  Line(submenux,posy + 6,width ,1,RGB(200,200,200))
+                  FormWindows()\FormMenus()\x1 = submenux
+                  FormWindows()\FormMenus()\x2 = submenux + width
+                  FormWindows()\FormMenus()\y1 = posy
+                  FormWindows()\FormMenus()\y2 = posy + 12
+                  posy + 12
+                Else
+                  If FormWindows()\FormMenus()\icon
+                    ChangeCurrentElement(FormWindows()\FormImg(),FormWindows()\FormMenus()\icon)
+                    img = ImageManager(FormWindows()\FormImg()\img)
+                    
+                    If IsImage(img)
+                      If ImageDepth(img) = 32
+                        DrawingMode(#PB_2DDrawing_AlphaBlend | #PB_2DDrawing_Transparent)
+                      Else
+                        DrawingMode(#PB_2DDrawing_Transparent)
+                      EndIf
+                      
+                      DrawImage(ImageID(img),submenux + 3,posy + 2,16,16)
+                      DrawingMode(#PB_2DDrawing_Transparent)
+                    EndIf
+                  EndIf
+                  
+                  DrawText(submenux + 24, posy, FormWindows()\FormMenus()\item,RGB(0,0,0))
+                  
+                  If FormWindows()\FormMenus()\shortcut
+                    DrawText(submenux + width - 10 - TextWidth(FormWindows()\FormMenus()\shortcut),posy, FormWindows()\FormMenus()\shortcut, RGB(0,0,0))
+                  EndIf
+                  
+                  FormWindows()\FormMenus()\x1 = submenux
+                  FormWindows()\FormMenus()\x2 = submenux + width
+                  FormWindows()\FormMenus()\y1 = posy
+                  FormWindows()\FormMenus()\y2 = posy + 20
+                  
+                  sub = 0
+                  PushListPosition(FormWindows()\FormMenus())
+                  If NextElement(FormWindows()\FormMenus())
+                    If FormWindows()\FormMenus()\level > level
+                      sub = 1
+                    EndIf
+                  EndIf
+                  PopListPosition(FormWindows()\FormMenus())
+                  
+                  If sub
+                    DrawingMode(#PB_2DDrawing_Transparent | #PB_2DDrawing_AlphaBlend)
+                    DrawImage(ImageID(#Img_MacSubMenu),submenux + width - 20,posy + 4)
+                    DrawingMode(#PB_2DDrawing_Transparent)
+                  EndIf
+                  
+                  posy + 20
+                EndIf
+                
+                If propgrid_menu = FormWindows()\FormMenus()
+                  DrawingMode(#PB_2DDrawing_Outlined)
+                  Box(FormWindows()\FormMenus()\x1, FormWindows()\FormMenus()\y1, FormWindows()\FormMenus()\x2 - FormWindows()\FormMenus()\x1 , FormWindows()\FormMenus()\y2 - FormWindows()\FormMenus()\y1, RGB(0,0,0))
+                  DrawingMode(#PB_2DDrawing_Transparent)
+                EndIf
+              EndIf
+            Else
+              Break
+            EndIf
+            count + 1
+          Until FormWindows()\FormMenus()\level < level
+          
+          AddElement(FormWindows()\FormMenuButtons())
+          FormWindows()\FormMenuButtons()\x1 = submenux
+          FormWindows()\FormMenuButtons()\x2 = submenux + width
+          FormWindows()\FormMenuButtons()\y1 = posy
+          FormWindows()\FormMenuButtons()\y2 = posy + 20
+          FormWindows()\FormMenuButtons()\level = ListSize(items()) - ListIndex(items())
+          
+          If FormWindows()\FormMenus()\level > 0 And count = 0
+            PreviousElement(FormWindows()\FormMenus())
+          EndIf
+          
+          FormWindows()\FormMenuButtons()\previous_el = previous_el
+          DrawText(submenux + 5, posy, "Add Item...",RGB(0,0,0))
+        Until PreviousElement(items()) = 0
+      EndIf
+      
+      If ListSize(FormWindows()\FormMenus())
+        level = 0
+        FirstElement(FormWindows()\FormMenus())
+        menuy2 = FormWindows()\FormMenus()\y2
+        
+        ForEach FormWindows()\FormMenus()
+          ; drag before the first menu title
+          If ListIndex(FormWindows()\FormMenus()) = 0 And menudragposx <= FormWindows()\FormMenus()\x1 And menudragposy >= FormWindows()\FormMenus()\y1 And menudragposy < FormWindows()\FormMenus()\y2
+            Line(FormWindows()\FormMenus()\x1 - 1, FormWindows()\FormMenus()\y1, 1, 16, RGB(0,0,255))
+            Line(FormWindows()\FormMenus()\x1, FormWindows()\FormMenus()\y1, 1, 16, RGB(0,0,255))
+          EndIf
+          
+          ; drag before the first menu item
+          If FormWindows()\FormMenus()\level > level And menudragposy >= FormWindows()\FormMenus()\y1 - 1 And menudragposy < FormWindows()\FormMenus()\y1 + 1 And menudragposx > FormWindows()\FormMenus()\x1 And menudragposx <= FormWindows()\FormMenus()\x2
+            Line(FormWindows()\FormMenus()\x1, FormWindows()\FormMenus()\y1 - 1, FormWindows()\FormMenus()\x2 - FormWindows()\FormMenus()\x1, 1, RGB(0,0,255))
+            Line(FormWindows()\FormMenus()\x1, FormWindows()\FormMenus()\y1, FormWindows()\FormMenus()\x2 - FormWindows()\FormMenus()\x1, 1, RGB(0,0,255))
+          EndIf
+          
+          If menudragposx > FormWindows()\FormMenus()\x1 And menudragposx <= FormWindows()\FormMenus()\x2 And menudragposy > FormWindows()\FormMenus()\y1 + 1 And menudragposy <= FormWindows()\FormMenus()\y2
+            If FormWindows()\FormMenus()\level = 0
+              Line(FormWindows()\FormMenus()\x2, FormWindows()\FormMenus()\y1, 1, 16, RGB(0,0,255))
+              Line(FormWindows()\FormMenus()\x2 + 1, FormWindows()\FormMenus()\y1, 1, 16, RGB(0,0,255))
+            Else
+              Line(FormWindows()\FormMenus()\x1, FormWindows()\FormMenus()\y2, FormWindows()\FormMenus()\x2 - FormWindows()\FormMenus()\x1, 1, RGB(0,0,255))
+              Line(FormWindows()\FormMenus()\x1, FormWindows()\FormMenus()\y2 + 1, FormWindows()\FormMenus()\x2 - FormWindows()\FormMenus()\x1, 1, RGB(0,0,255))
+            EndIf
+          EndIf
+          
+          If FormWindows()\FormMenus() = propgrid_menu ; move to a new level
+            oldLevel = FormWindows()\FormMenus()\level
+            PushListPosition(FormWindows()\FormMenus())
+            check = 0
+            If NextElement(FormWindows()\FormMenus())
+              If FormWindows()\FormMenus()\level <= oldLevel
+                PreviousElement(FormWindows()\FormMenus())
+                check = 1
+              EndIf
+            EndIf
+            
+            ; move to an empty opened submenu
+            If check And menudragposx > FormWindows()\FormMenus()\x2 And menudragposy > menuy2
+              Line(FormWindows()\FormMenus()\x2, FormWindows()\FormMenus()\y1, 100, 1, RGB(0,0,255))
+              Line(FormWindows()\FormMenus()\x2, FormWindows()\FormMenus()\y1 + 1, 100, 1, RGB(0,0,255))
+            EndIf
+            PopListPosition(FormWindows()\FormMenus())
+          EndIf
+          
+          level = FormWindows()\FormMenus()\level
+        Next
+      EndIf
+      
+      
+      ;}
+      
     StopDrawing()
     
     If StartDrawing(CanvasOutput(#GADGET_Form_Canvas))
-      DrawingMode(#PB_2DDrawing_Transparent)
-      DrawImage(ImageID(#Drawing_Img),0,0)
+        DrawingMode(#PB_2DDrawing_Transparent)
+        DrawImage(ImageID(#Drawing_Img),0,0)
       StopDrawing()
     EndIf
   EndIf
@@ -6752,9 +6947,9 @@ Procedure FD_ProcessEventGridGadget(col,row)
     Case 2 ; Variable
       Protected input.s, name.s, rhs.s
       Protected eqPos.i, id.i
-    
+      
       input = Trim(grid_GetCellString(propgrid, 2, row))
-    
+      
       If input = ""
         ; revert to current model value
         If FormWindows()\FormGadgets()\pbany
@@ -6766,11 +6961,11 @@ Procedure FD_ProcessEventGridGadget(col,row)
             grid_SetCellString(propgrid, 2, row, FormWindows()\FormGadgets()\variable)
           EndIf
         EndIf
-    
+        
       Else
         ; parse "NAME" or "NAME=123"
         eqPos = FindString(input, "=")
-    
+        
         If eqPos
           name = Trim(Left(input, eqPos - 1))
           rhs  = Trim(Mid(input, eqPos + 1))
@@ -6779,18 +6974,18 @@ Procedure FD_ProcessEventGridGadget(col,row)
           name = input
           id   = 0
         EndIf
-    
+        
         ; validate NAME using existing validator 
         If FD_CheckVariable(name)
           FormWindows()\FormGadgets()\variable = name
-    
+          
           If FormWindows()\FormGadgets()\pbany
             ; PB_Any gadgets must not use explicit IDs
             FormWindows()\FormGadgets()\explicitId = 0
           Else
             FormWindows()\FormGadgets()\explicitId = id
           EndIf
-    
+          
           ; normalize display text
           If FormWindows()\FormGadgets()\pbany
             grid_SetCellString(propgrid, 2, row, FormWindows()\FormGadgets()\variable)
@@ -6801,7 +6996,7 @@ Procedure FD_ProcessEventGridGadget(col,row)
               grid_SetCellString(propgrid, 2, row, FormWindows()\FormGadgets()\variable)
             EndIf
           EndIf
-    
+          
         Else
           ; invalid -> revert
           If FormWindows()\FormGadgets()\pbany
@@ -7012,9 +7207,9 @@ Procedure FD_ProcessEventGridWindow(col,row)
     Case 2 ; Variable
       Protected input.s, name.s, rhs.s
       Protected eqPos.i, id.i
-    
+      
       input = Trim(grid_GetCellString(propgrid, 2, row))
-    
+      
       If input = ""
         ; revert to current model value
         If FormWindows()\pbany
@@ -7026,11 +7221,11 @@ Procedure FD_ProcessEventGridWindow(col,row)
             grid_SetCellString(propgrid, 2, row, FormWindows()\variable)
           EndIf
         EndIf
-    
+        
       Else
         ; parse "NAME" or "NAME=123"
         eqPos = FindString(input, "=")
-    
+        
         If eqPos
           name = Trim(Left(input, eqPos - 1))
           rhs  = Trim(Mid(input, eqPos + 1))
@@ -7039,18 +7234,18 @@ Procedure FD_ProcessEventGridWindow(col,row)
           name = input
           id   = 0
         EndIf
-    
+        
         ; validate NAME using existing validator 
         If FD_CheckVariable(name)
           FormWindows()\variable = name
-    
+          
           If FormWindows()\pbany
             ; PB_Any gadgets must not use explicit IDs
             FormWindows()\explicitId = 0
           Else
             FormWindows()\explicitId = id
           EndIf
-    
+          
           ; normalize display text
           If FormWindows()\pbany
             grid_SetCellString(propgrid, 2, row, FormWindows()\variable)
@@ -7061,7 +7256,7 @@ Procedure FD_ProcessEventGridWindow(col,row)
               grid_SetCellString(propgrid, 2, row, FormWindows()\variable)
             EndIf
           EndIf
-    
+          
         Else
           ; invalid -> revert
           If FormWindows()\pbany
@@ -7771,7 +7966,7 @@ Procedure FD_EventMain(gadget, event_type)
             x = GetGadgetAttribute(#GADGET_Form_Canvas,#PB_Canvas_MouseX)
             y = GetGadgetAttribute(#GADGET_Form_Canvas,#PB_Canvas_MouseY)
             FD_LeftUp(x,y)
-
+            
           Case #PB_EventType_LeftDoubleClick
             FD_LeftDoubleClick()
             ;
@@ -7786,7 +7981,7 @@ Procedure FD_EventMain(gadget, event_type)
             menudragposx = 0
             menudragposy = 0
             ;redraw = 1
-
+            
           Case #PB_EventType_RightClick
             x = GetGadgetAttribute(#GADGET_Form_Canvas,#PB_Canvas_MouseX)
             y = GetGadgetAttribute(#GADGET_Form_Canvas,#PB_Canvas_MouseY)

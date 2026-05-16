@@ -13,7 +13,7 @@ Global P_SplitterWidth, ScrollAreaW, Panel_Height, P_ScrollWidth
 Global multiselectStart, multiselectParent, multiselectFirstScan
 
 Global grid_color_bg.l, grid_color_fg.l, grid_color_text.l, grid_color_light.l, grid_color_mid.l, grid_color_dark.l
-
+Global lastmenuselected.i
 #Page_Padding = 10
 
 CompilerSelect #PB_Compiler_OS
@@ -109,6 +109,7 @@ Structure FormGadget
   tooltip.s
   tooltipvariable.b
   variable.s
+  lastvariable.s
   explicitId.i
   image.q
   imageid.s ; for parsing when loading
@@ -161,7 +162,6 @@ Structure FormMenu
   shortcut.s
   icon.q
   event.s
-
   x1.i
   x2.i
   y1.i
@@ -207,6 +207,7 @@ Structure FormWindow
   width.i
   height.i
   variable.s
+  lastvariable.s
   explicitId.i
   caption.s
   captionvariable.b
@@ -217,7 +218,7 @@ Structure FormWindow
   disabled.b
   hidden.b
   parent.s
-
+  
   lastgadgetselected.i
 
   event_file.s
