@@ -4607,7 +4607,6 @@ Procedure FD_LeftDoubleClick()
     EndIf
   Next
   
-  
   ;dblclick on Gadgets
   ;The `ListSize(ObjList())>1` object is required; a call to `FormWindows()\FormGadgets()` will cause the program to crash if no gadgets are present.
   Define.s newEvent = "", currentEvent = "", displayName = "", EventName  = ""
@@ -4743,16 +4742,14 @@ Procedure FD_LeftDoubleClick()
       
     EndIf
     FirstOpenWindowEntry = #True  
-    
-    
   EndIf
-  
+
   If EventName <> ""
     FindSearchString$ = "Procedure OpenWindow" + FormWindows()\variable + "()"
     If FindProcedure(FindSearchString$) = #True ; Find And Jump zo FindProcedure
       SendEditorMessage(#SCI_LINEUP, 0, 0)
     EndIf
-    
+
     ;Find the Gadget Procedure and jump
     If *ActiveSource <> *ProjectInfo
       
@@ -4779,25 +4776,26 @@ Procedure FD_LeftDoubleClick()
                             TextToInsert$ + #Endline
           EndIf
         EndIf
-        
+
         *UTF8Buffer = UTF8(TextToInsert$)
         If *UTF8Buffer
           SendEditorMessage(#SCI_REPLACESEL, 0, *UTF8Buffer)
           FreeMemory(*UTF8Buffer)
         EndIf
         
-        If FindProcedure("BindGadgetEvent(" + FormWindows()\FormGadgets()\variable) = #False
-          FindProcedure("Open" + FormWindows()\variable + "()") ; jump to OpenFormname
-          SendEditorMessage(#SCI_LINEDOWN, 0, 0)
-          ;SendEditorMessage(#SCI_NEWLINE)
-          TextToInsert$ = "  BindGadgetEvent(" + FormWindows()\FormGadgets()\variable + ", @" + EventName + "(), #PB_All)" + #EndLine
-          *UTF8Buffer = UTF8(TextToInsert$)
-          If *UTF8Buffer
-            SendEditorMessage(#SCI_REPLACESEL, 0, *UTF8Buffer)
-            FreeMemory(*UTF8Buffer)
-          EndIf          
-        EndIf
-        
+        If ListSize(ObjList()) > 1
+			If FindProcedure("BindGadgetEvent(" + FormWindows()\FormGadgets()\variable) = #False
+			  FindProcedure("Open" + FormWindows()\variable + "()") ; jump to OpenFormname
+			  SendEditorMessage(#SCI_LINEDOWN, 0, 0)
+			  ;SendEditorMessage(#SCI_NEWLINE)
+			  TextToInsert$ = "  BindGadgetEvent(" + FormWindows()\FormGadgets()\variable + ", @" + EventName + "(), #PB_All)" + #EndLine
+			  *UTF8Buffer = UTF8(TextToInsert$)
+			  If *UTF8Buffer
+				SendEditorMessage(#SCI_REPLACESEL, 0, *UTF8Buffer)
+				FreeMemory(*UTF8Buffer)
+			  EndIf          
+			EndIf
+		EndIf
         SendEditorMessage(#SCI_SETSEL, 0, 0)
         FindProcedure(EventName + "(") ; jump to new procedure line
         SendEditorMessage(#SCI_VCHOME)
@@ -7813,7 +7811,7 @@ Procedure FD_ProcessMenuEvent(menu_event)
             ElseIf menu_color_row = 21
               FormWindows()\FormGadgets()\backcolor = -1
             EndIf
-            grid_Redraw(propgrid)
+           ; grid_Redraw(propgrid)
             redraw = 1
             FormChanges(1)
         EndSelect
