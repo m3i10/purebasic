@@ -1,10 +1,8 @@
-# PureBasic OpenSource Projects
+# PureBasic OpenSource Projects - FormDesigner Fork
 
 [![GPLv3][GPL badge]][GPL License]&nbsp;
 [![Fantaisie Software License][Fantaisie badge]][Fantaisie License]
 [![Build Status](https://travis-ci.com/fantaisie-software/purebasic.svg?branch=master)](https://travis-ci.com/fantaisie-software/purebasic)
-
-# PureBasic Editor - FormDesigner Fork
 
 This fork introduces several enhancements and optimizations for the integrated FormDesigner. 
 
@@ -18,6 +16,7 @@ This fork introduces several enhancements and optimizations for the integrated F
 * **Multi-Editing for Scintilla:** Multi-editing support within the Scintilla gadget has been enabled by default.
 * **Optional Window Position Persistence:** Window coordinates can now be saved persistently. Once the corresponding code section is uncommented, the window position is saved upon closing and automatically restored on the next launch.
 
+----
 
 - `Repository:` https://github.com/fantaisie-software/purebasic
 - `Vanity URL:` https://git.io/purebasic
