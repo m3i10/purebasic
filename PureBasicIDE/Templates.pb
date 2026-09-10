@@ -76,7 +76,7 @@ CompilerEndIf
 
 
 Procedure Template_Save()
-
+  
   If CreateFile(#FILE_Template, TemplatesFile$)
     WriteStringN(#FILE_Template, "TEMPLATES:1.0")
     WriteStringN(#FILE_Template, "")
