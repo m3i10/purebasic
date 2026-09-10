@@ -4,6 +4,21 @@
 [![Fantaisie Software License][Fantaisie badge]][Fantaisie License]
 [![Build Status](https://travis-ci.com/fantaisie-software/purebasic.svg?branch=master)](https://travis-ci.com/fantaisie-software/purebasic)
 
+# PureBasic Editor - FormDesigner Fork
+
+This fork introduces several enhancements and optimizations for the integrated FormDesigner. 
+
+> **Activation:** To enable the new features, please activate the option **Form -> Auto Create Main And Event handlers** in the settings.
+
+## Features & Improvements
+
+* **Automated Event Generation:** Double-clicking a gadget automatically generates the corresponding event handler and jumps directly to the code block. A prompt to specify the filename will appear beforehand.
+* **Dynamic Variable Synchronization:** Changes made to variables within the Form Properties are automatically synchronized throughout the entire event file upon the next double-click on any gadget.
+* **Intelligent Gadget Naming:** Gadgets are automatically renamed using the format `[WindowName]_[GadgetName]`. For example, if your main window is named `Fenster` and you name a button `OK`, it will automatically be converted to `Fenster_OK`.
+* **Multi-Editing for Scintilla:** Multi-editing support within the Scintilla gadget has been enabled by default.
+* **Optional Window Position Persistence:** Window coordinates can now be saved persistently. Once the corresponding code section is uncommented, the window position is saved upon closing and automatically restored on the next launch.
+
+
 - `Repository:` https://github.com/fantaisie-software/purebasic
 - `Vanity URL:` https://git.io/purebasic
 
