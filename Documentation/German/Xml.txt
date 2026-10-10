@@ -1,7 +1,7 @@
 ﻿;
 ;     Xml library documentation
 ;
-;      (c) 2025 - Fantaisie Software
+;      (c) 2026 - Fantaisie Software
 ;
 
 @Library XML
@@ -660,7 +660,8 @@
 
 @OptionalParameter "EinrückungsSchritt"
   Die anzuwendende Einrückung (in Zeichen) bei der Anwendung der @#PB_XML_ReFormat bzw. @#PB_XML_ReIndent Flags.
-  
+  Negative Werte werden als 0 behandelt.
+
 @NoReturnValue
   
 @SeeAlso
@@ -785,7 +786,7 @@
   außerhalb jeglicher XML-Knoten (es kann sich kein Text außerhalb von Knoten befinden).
   Die Unterknoten (englisch "Children") dieses Knotens sind der @Link "MainXMLNode" "Hauptknoten"
   und jegliche Kommentare außerhalb des Hauptknotens. Der @Link "XMLNodeType" "Typ" dieses Knotens
-  ist @#PB_Xml_Root.
+  ist @#PB_XML_Root.
 
 @Parameter "#XML"
   Die zu verwendende XML-Struktur (Baum).
@@ -807,7 +808,7 @@
   "main" oder "document" Knoten beinhalten, welcher alle anderen Knoten beinhaltet. Neben diesem
   Knoten können sich nur noch Kommentare auf der ersten Ebene (englisch "Level") unterhalb des
   @Link "RootXMLNode" "Wurzelknotens" befinden. Der @Link "XMLNodeType" "Typ" dieses Knotens
-  ist @#PB_Xml_Normal.
+  ist @#PB_XML_Normal.
 
 @Parameter "#XML"
   Die zu verwendende XML-Struktur (Baum).
