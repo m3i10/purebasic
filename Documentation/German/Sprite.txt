@@ -1,7 +1,7 @@
 ﻿;
 ;     Sprite library documentation
 ;
-;      (c) 2025 - Fantaisie Software
+;      (c) 2026 - Fantaisie Software
 ;
 
 @Library Sprite
@@ -80,6 +80,8 @@ Hardware-Beschleunigung ermöglicht.
   @@UseTIFFImageDecoder
 @LineBreak
   @@UseTGAImageDecoder
+@LineBreak
+  @@UseWebPImageDecoder
 
 @Parameter "#Sprite"
   Eine Nummer zum Identifizieren des neuen Sprites. @ReferenceLink "purebasic_objects" "#PB_Any"
@@ -204,7 +206,7 @@ Hardware-Beschleunigung ermöglicht.
   @#PB_Sprite_AlphaBlending : Das Sprite wird mit per Pixel Alpha-Kanal Unterstützung erstellt, benötigt
                              für @@DisplayTransparentSprite.
   @#PB_Sprite_Transparent   : Das Sprite wird vollständig transparent erstellt (Alphakanalwert auf 0 gesetzt). Falls verwendet,
-                             sollte @@DrawingMode bei Verwendung von @@SpriteOutput auf @#PB_DrawingMode_AllChannels gesetzt werden.
+                             sollte @@DrawingMode bei Verwendung von @@SpriteOutput auf @#PB_2DDrawing_AllChannels gesetzt werden.
 @EndFixedFont
 
 @ReturnValue
@@ -471,6 +473,8 @@ Hardware-Beschleunigung ermöglicht.
   @@UseTIFFImageDecoder
 @LineBreak
   @@UseTGAImageDecoder
+@LineBreak
+  @@UseWebPImageDecoder
 
 @Parameter "#Sprite"
   Eine Nummer zum Identifizieren des neu geladenen Sprites. @ReferenceLink "purebasic_objects" "#PB_Any"
@@ -522,6 +526,7 @@ Hardware-Beschleunigung ermöglicht.
   @#PB_ImagePlugin_JPEG     : Speichert das Bild als JPEG (der Befehl @@UseJPEGImageEncoder muss verwendet werden)
   @#PB_ImagePlugin_JPEG2000 : Speichert das Bild als JPEG2000 (der Befehl @@UseJPEG2000ImageEncoder muss verwendet werden)
   @#PB_ImagePlugin_PNG      : Speichert das Bild als PNG  (der Befehl @@UsePNGImageEncoder muss verwendet werden)
+  @#PB_ImagePlugin_WEBP     : Speichert das Bild als WebP (der Befehl @@UseWebPImageEncoder muss verwendet werden)
 @EndFixedFont
 
 @OptionalParameter "Flags"
