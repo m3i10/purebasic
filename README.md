@@ -16,6 +16,8 @@ This fork introduces several enhancements and optimizations for the integrated F
 * **Multi-Editing for Scintilla:** Multi-editing support within the Scintilla gadget has been enabled by default.
 * **Optional Window Position Persistence:** Window coordinates can now be saved persistently. Once the corresponding code section is uncommented, the window position is saved upon closing and automatically restored on the next launch.
 
+
+To ensure successful compilation, you may need to have the latest version of PureBasic installed (including alpha or beta versions).
 ----
 
 - `Repository:` https://github.com/fantaisie-software/purebasic
