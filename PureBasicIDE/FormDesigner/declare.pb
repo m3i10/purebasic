@@ -16,6 +16,7 @@ Global P_SplitterWidth, ScrollAreaW, Panel_Height, P_ScrollWidth
 Global multiselectStart, multiselectParent, multiselectFirstScan
 
 Global grid_color_bg.l, grid_color_fg.l, grid_color_text.l, grid_color_light.l, grid_color_mid.l, grid_color_dark.l
+Global lastmenuselected.i
 
 #Page_Padding = 10
 
@@ -112,6 +113,7 @@ Structure FormGadget
   tooltip.s
   tooltipvariable.b
   variable.s
+  lastvariable.s
   explicitId.i
   image.q
   imageid.s ; for parsing when loading
@@ -210,6 +212,7 @@ Structure FormWindow
   width.i
   height.i
   variable.s
+  lastvariable.s
   explicitId.i
   caption.s
   captionvariable.b
@@ -225,7 +228,7 @@ Structure FormWindow
 
   event_file.s
   event_proc.s
-
+  
   List FormCustomFlags.s()
 
   List FormImg.FormImg()

@@ -208,7 +208,7 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
               "; Manual modification is possible to adjust existing commands, but anything else will be dropped when the code is compiled." + #Endline +
               "; Event procedures need to be put in another source file." + #Endline +
               ";" + #Endline + #Endline
-  
+  content+ "UseMD5Fingerprint()" + #Endline
   If windowvar <> ""
     content + "Global "+windowvar + #Endline
     content + "" + #Endline
@@ -434,7 +434,30 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
   EndIf
   
   content+ #Endline
+  content+ "Procedure SaveWindowPos" + FormWindows()\variable + "()" + #Endline
+  content+ "  X = WindowX(" + FormWindows()\variable + ")" + #Endline
+  content+ "  Y = WindowY(" + FormWindows()\variable + ")" + #Endline
+  content+ "  width = WindowWidth(" + FormWindows()\variable + ")" + #Endline
+  content+ "  height = WindowHeight(" + FormWindows()\variable + ")" + #Endline
+  content+ "  Protected File.s = GetPathPart(ProgramFilename()) + StringFingerprint(GetFilePart(ProgramFilename(), #PB_FileSystem_NoExtension) + " + 
+           #DQUOTE$ + FormWindows()\variable + #DQUOTE$ + " , #PB_Cipher_MD5) + " + #DQUOTE$ + ".pos" + #DQUOTE$ + #Endline
+
+  content+ "  If CreatePreferences(File)" + #Endline
+  content+ "    WritePreferenceInteger(" + #DQUOTE$ + "x" + #DQUOTE$ + ", " + "X)" + #Endline
+  content+ "    WritePreferenceInteger(" + #DQUOTE$ + "y" + #DQUOTE$ + ", " + "Y)" + #Endline
+  content+ "    WritePreferenceInteger(" + #DQUOTE$ + "width" + #DQUOTE$ + ", " + "width)" + #Endline
+  content+ "    WritePreferenceInteger(" + #DQUOTE$ + "height" + #DQUOTE$ + ", " + "height)" + #Endline
+  content+ "    ClosePreferences()" + #Endline
+  content+ "  EndIf" + #Endline
+  content+ "EndProcedure" + #Endline + #Endline
   
+  content+ "Procedure DelWindowPos" + FormWindows()\variable + "()" + #Endline
+  content+ "  Protected File.s = GetPathPart(ProgramFilename()) + StringFingerprint(GetFilePart(ProgramFilename(), #PB_FileSystem_NoExtension) + " + 
+           #DQUOTE$ + FormWindows()\variable + #DQUOTE$ + " , #PB_Cipher_MD5) + " + #DQUOTE$ + ".pos" + #DQUOTE$ + #Endline
+
+  content+ "  DeleteFile(GetFilePart(ProgramFilename()) + File)" + #Endline
+  content+ "EndProcedure" + #Endline + #Endline
+   
   content+ "Procedure Resize_" + FormWindows()\variable + "()" + #Endline
   content+ "  Protected ScaleX.f, ScaleY.f" + #Endline
   
@@ -1023,7 +1046,19 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
           winy.s = Str(DesktopUnscaledY(FormWindows()\y))
         EndIf
         
-        content +"Procedure Open"+FormWindows()\variable+"(x = " + winx + ", y = " + winy + ", width = " + Str(DesktopUnscaledX(FormWindows()\width)) + ", height = " + Str(DesktopUnscaledY(FormWindows()\height)) + ")" + #Endline
+        content+ "Procedure Open"+FormWindows()\variable+"(x = " + winx + ", y = " + winy + ", width = " + Str(DesktopUnscaledX(FormWindows()\width)) + ", height = " + 
+                 Str(DesktopUnscaledY(FormWindows()\height)) + ")" + #Endline
+        
+        content+ "  Protected File.s = GetPathPart(ProgramFilename()) + StringFingerprint(GetFilePart(ProgramFilename(), #PB_FileSystem_NoExtension) + " + 
+                 #DQUOTE$ + FormWindows()\variable + #DQUOTE$ + " , #PB_Cipher_MD5) + " + #DQUOTE$ + ".pos" + #DQUOTE$ + #Endline
+        
+        content+ "  If OpenPreferences(File)" + #Endline
+        content+ "    X.i = ReadPreferenceInteger("     + #DQUOTE$ + "x"      + #DQUOTE$ + ", X)" + #Endline
+        content+ "    Y.i = ReadPreferenceInteger("     + #DQUOTE$ + "y"      + #DQUOTE$ + ", Y)" + #Endline
+        content+ "    width.i = ReadPreferenceInteger(" + #DQUOTE$ + "width"  + #DQUOTE$ + ", width)" + #Endline
+        content+ "    height.i = ReadPreferenceInteger(" + #DQUOTE$ + "height"  + #DQUOTE$ + ", height)" + #Endline
+        content+ "   ClosePreferences()" + #Endline
+        content+ "  EndIf" + #Endline + #Endline
         
         AddElement(Procs())
         Procs() = "Open"+FormWindows()\variable+"()"

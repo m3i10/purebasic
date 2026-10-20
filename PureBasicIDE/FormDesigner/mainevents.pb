@@ -1114,6 +1114,46 @@ Procedure FD_UpdateObjList()
     EndIf
     
   EndIf
+  
+  ; We need two state variables—one for this routine and one for the double-click routine—to detect changes.
+  Static LastFormWindowsVariable.s 
+  If FormAutoCreateEvent = #True
+    ForEach FormWindows()\FormGadgets()
+      ; create new Gadget and init
+      If FormWindows()\FormGadgets()\lastvariable = ""
+        FormWindows()\FormGadgets()\lastvariable = FormWindows()\FormGadgets()\variable
+        If FindString(FormWindows()\FormGadgets()\variable, FormWindows()\variable) = 0
+          FormWindows()\FormGadgets()\variable = FormWindows()\variable + "_" + FormWindows()\FormGadgets()\variable
+        EndIf
+        grid_SetCellString(propgrid, 2, 2, FormWindows()\FormGadgets()\variable)
+      EndIf  
+      
+      ;init for first load
+      If FormWindows()\lastvariable = ""
+        FormWindows()\lastvariable = FormWindows()\variable
+        LastFormWindowsVariable = FormWindows()\variable
+      EndIf
+      
+      ;if change the Window Variablename, change all Gadgetsvariable, two
+      If FormWindows()\variable <> LastFormWindowsVariable
+        FormWindows()\FormGadgets()\variable = ReplaceString(FormWindows()\FormGadgets()\variable, LastFormWindowsVariable, FormWindows()\variable)
+      EndIf
+      
+      ;if no Formvariablename in the Gadgetsvariablename then create
+      If FindString(FormWindows()\FormGadgets()\variable, FormWindows()\variable) = 0
+        FormWindows()\FormGadgets()\variable = FormWindows()\variable + "_" + FormWindows()\FormGadgets()\variable
+        GadgetsChanges = #True 
+      EndIf
+      
+    Next
+    
+    ;if the Name change then show
+    If GadgetsChanges = #True
+      ChangeCurrentElement(FormWindows()\FormGadgets(), FormWindows()\lastgadgetselected)
+      grid_SetCellString(propgrid, 2, 2, FormWindows()\FormGadgets()\variable)
+    EndIf
+    LastFormWindowsVariable = FormWindows()\variable
+  EndIf
 EndProcedure
 Global NewList Deletelist.i()
 Procedure FD_DeleteGadgetA(gadget)
@@ -4432,104 +4472,74 @@ Procedure FD_MoveMultiSelection(x,y)
 EndProcedure
 
 Procedure.i FindProcedure(FindSearchString$)
-
   If FindSearchString$ = ""
     ProcedureReturn -1
   EndIf
-
+  
   Protected *buffer
   Protected length
   Protected result
   Protected textLength
   Protected line
-
+  
   *buffer = UTF8(FindSearchString$)
   length  = MemorySize(*buffer) - 1
-
+  
   textLength = SendEditorMessage(#SCI_GETTEXTLENGTH, 0, 0)
-
+  
   SendEditorMessage(#SCI_SETTARGETSTART, 0, 0)
   SendEditorMessage(#SCI_SETTARGETEND, textLength, 0)
-
+  
   result = SendEditorMessage(#SCI_SEARCHINTARGET, length, *buffer)
-
+  
   FreeMemory(*buffer)
-
+  
   If result <> -1
     SendEditorMessage(#SCI_GOTOPOS, result, 0)
     ProcedureReturn #True
   EndIf
-
+  
   ProcedureReturn #False
-
+  
 EndProcedure
 
+Procedure ReplaceAll(Search.s, Replace.s)
+  Protected *S = UTF8(Search), *R = UTF8(Replace)
+  If *S And *R
+    SendEditorMessage(#SCI_SETTARGETSTART, 0, 0)
+    SendEditorMessage(#SCI_SETTARGETEND, SendEditorMessage(#SCI_GETLENGTH, 0, 0), 0)
+    
+    While SendEditorMessage(#SCI_SEARCHINTARGET, MemorySize(*S)-1, *S) <> -1
+      SendEditorMessage(#SCI_REPLACETARGET, -1, *R)
+      SendEditorMessage(#SCI_SETTARGETSTART, SendEditorMessage(#SCI_GETTARGETEND, 0, 0), 0)
+      SendEditorMessage(#SCI_SETTARGETEND, SendEditorMessage(#SCI_GETLENGTH, 0, 0), 0)
+    Wend
+    
+    FreeMemory(*S) : FreeMemory(*R)
+  EndIf
+EndProcedure
+
+
 Procedure FD_LeftDoubleClick()
+  Static FreeGadgetID
   Protected *UTF8Buffer
-  *UTF8Buffer = UTF8(TextToInsert$)
-
-  FormAutoProcName = #False ;Setting to automatically copy event name from variable name. "True" means variable=Window_0; text=Window_0; event_proc=Event_Window_0 or event_proc=Event_Button_0
-                            ;"False" MessageRequester Ask before setting the variable
-
+  Protected FormGadgetsChangeVariable
+  
+  CreateBindEvent  = #True ;Create BindEvent and Eventprocedure.
+  FormAutoProcName = #True ;Setting to automatically copy event name from variable name. "True" means variable=Window_0; text=Window_0; event_proc=Event_Window_0 or event_proc=Event_Button_0
+                           ;"False" MessageRequester Ask before setting the variable
+  
   If FormAutoCreateEvent = #False
     ProcedureReturn
   EndIf
-
-  Define dbprocname.s = ""
-  Define cellValue.s  = grid_GetCellString(propgrid, 2, 2)
-  Define ConstantValue.s = grid_GetCellString(propgrid, 2, 0)
-  dblClickFormObject.s = ""
-
-
-  ;dblclick on Gadgets
-  ;The `ListSize(ObjList())>1` object is required; a call to `FormWindows()\FormGadgets()` will cause the program to crash if no gadgets are present.
-  Define.s newEvent, currentEvent, displayName, EventName
-  If cellValue = FormWindows()\variable
-    dblClickFormObject = "window"
-    displayName  = FormWindows()\variable
-    newEvent     = "Event_" + displayName
-    currentEvent = FormWindows()\event_proc
-
-  ElseIf FindString(ConstantValue, "#")
-    dblClickFormObject = "menu"
-    displayName  = FormWindows()\FormMenus()\item
-    newEvent     = "Event_" + ReplaceString(displayName, "#", "")
-    currentEvent = FormWindows()\FormMenus()\event
-
-  ElseIf ListSize(ObjList()) > 1
-    dblClickFormObject = "gadget"
-    ChangeCurrentElement(FormWindows()\FormGadgets(), FormWindows()\lastgadgetselected)
-    displayName  = FormWindows()\FormGadgets()\variable
-    newEvent     = "Event_" + displayName
-    currentEvent = FormWindows()\FormGadgets()\event_proc
-  EndIf
-
-  If dblClickFormObject = "" : ProcedureReturn : EndIf
-
-  If FormWindows()\event_proc=""
-    FormWindows()\event_proc = FormWindows()\variable
-  EndIf
   
-  If currentEvent = ""
-    If FormAutoProcName = #False And MessageRequester(#ProductName$, LanguagePattern("Form","ProcAutoName", "%proc%", displayName), #PB_MessageRequester_YesNo) = #PB_MessageRequester_No
-      ProcedureReturn
-    EndIf
-    EventName = newEvent
-  Else
-    EventName = currentEvent
-  EndIf
-
-  Select dblClickFormObject
-    Case "menu"   : FormWindows()\FormMenus()\event = EventName
-    Case "window" : FormWindows()\event_proc = EventName
-    Case "gadget" : FormWindows()\FormGadgets()\event_proc = EventName
-      If FormWindows()\FormGadgets()\caption = ""
-        FormWindows()\FormGadgets()\caption = displayName
-      EndIf
-  EndSelect
-
-  dbprocname = EventName
-
+  Define dbprocname.s = ""
+  Define cellVariable.s  = grid_GetCellString(propgrid, 2, 2)
+  Define ConstantValue.s = grid_GetCellString(propgrid, 2, 0)
+  Define MenuBarCellName.s = grid_GetCellString(propgrid, 2, 1)
+  Define MenuBarCellEvent_proc.s = grid_GetCellString(propgrid, 2, 6)
+  dblClickFormObject.s = ""
+  
   ;if there is no filename, create filename ask for save
   If GetFilePart(*ActiveSource\FileName$, #PB_FileSystem_NoExtension)=""
     If SaveSourceAs() = -1
@@ -4537,90 +4547,255 @@ Procedure FD_LeftDoubleClick()
       ProcedureReturn
     EndIf
   EndIf
-
-  ;create Main Source File
-  FileName$=GetFilePart(*ActiveSource\FileName$, #PB_FileSystem_NoExtension)
-  Path$=GetCurrentDirectory()
-  FileNameTemp$ = Path$ + FileName$ + ".pb"
-  If FileSize(FileNameTemp$) = -1
-    File = OpenFile(#PB_Any, FileNameTemp$)
-    If File
-      FileSeek(File, Lof(0))
-      ;WriteStringN(File, "Declare Resize_Window()")
-      ;WriteStringN(File, "Declare SetWindowTransparency_" + FormWindows()\variable +"(Window, Alpha)" + #Endline)
-      WriteStringN(File, "XIncludeFile " + Chr(34) + FileName$ + ".pbf" + Chr(34)) ;FormWindows()\variable
-      WriteStringN(File, "XIncludeFile " + Chr(34) + FileName$ + "_events.pb" + Chr(34))
-      WriteStringN(File, "Open" + FormWindows()\variable + "()")
-      WriteStringN(File, ";SetWindowTransparency_" + FormWindows()\variable +"(" + FormWindows()\variable + ", 255) ;min. 0: max. 255" + #Endline)      
-      WriteStringN(File, "")
-      WriteStringN(File, "Repeat")
-      WriteStringN(File, "   event=WaitWindowEvent()")
-      WriteStringN(File, "   " + FormWindows()\variable + "_Events(event)")
-      WriteStringN(File, "Until event=#PB_Event_CloseWindow")
-      CloseFile(File)
-    EndIf
-  EndIf
-  LoadSourceFile(FileNameTemp$)
   
+  ;create Main Source File
+  FileName$ = GetFilePart(*ActiveSource\FileName$, #PB_FileSystem_NoExtension)
+  
+  Path$ = GetCurrentDirectory()  
   ;create Event File
   FileNameTemp$ = Path$ + FileName$ + "_events.pb"
   If FileSize(FileNameTemp$) =-1 ;Create File
-      File = OpenFile(#PB_Any, FileNameTemp$, #PB_File_Append)
-      CloseFile(File)
+    File = OpenFile(#PB_Any, FileNameTemp$, #PB_File_Append)
+    CloseFile(File)
+    Delay(1000)
   EndIf
   
   LoadSourceFile(FileNameTemp$)
-
-  If FormWindows()\event_proc
-    ProcFound=#False
+  ;If Change the Formname, change the name in Codeeditor, two
+  If FormWindows()\lastvariable <> ""
+    If FormWindows()\lastvariable <> FormWindows()\variable
+      ReplaceAll("_" + FormWindows()\lastvariable + "_" , "_" + FormWindows()\variable + "_")
+      ReplaceAll("_" + FormWindows()\lastvariable + "()" , "_" + FormWindows()\variable + "()")
+      ReplaceAll("= " + FormWindows()\lastvariable, "= " + FormWindows()\variable)
+      ReplaceAll("=" + FormWindows()\lastvariable, "= " + FormWindows()\variable)
+      ReplaceAll("(" + FormWindows()\lastvariable + ")" , "(" + FormWindows()\variable + ")")
+      ReplaceAll("_" + FormWindows()\lastvariable + "_" , "_" + FormWindows()\variable + "_")
+      ReplaceAll("Window" + FormWindows()\lastvariable + "()", "Window" + FormWindows()\variable+ "()")
+      ReplaceAll("Open" + FormWindows()\lastvariable + "()", "Open" + FormWindows()\variable+ "()")
+      ReplaceAll("(" + FormWindows()\lastvariable + "_" , "(" + FormWindows()\variable + "_")
+      ;ReplaceAll(FormWindows()\lastvariable , FormWindows()\variable)
+    EndIf    
+  EndIf
+  FormWindows()\lastvariable = FormWindows()\variable
+  
+  ;- Variable Change
+  ForEach FormWindows()\FormGadgets()
+    If FormWindows()\FormGadgets()\lastvariable <> ""
+      ;if the button create first time   
+      ReplaceAll(FormWindows()\FormGadgets()\lastvariable + "(", FormWindows()\FormGadgets()\variable + "(") ;Gadget Event Procedure
+      ReplaceAll(FormWindows()\FormGadgets()\lastvariable + ",", FormWindows()\FormGadgets()\variable + ",") ;BindGadget
+      FormWindows()\FormGadgets()\lastvariable = FormWindows()\FormGadgets()\variable
+    EndIf
+  Next
+  
+  ;dblclick on Gadgets
+  ;The `ListSize(ObjList())>1` object is required; a call to `FormWindows()\FormGadgets()` will cause the program to crash if no gadgets are present.
+  Define.s newEvent = "", currentEvent = "", displayName = "", EventName  = ""
+  If cellVariable = FormWindows()\variable
+    dblClickFormObject = "window"
+    displayName  = FormWindows()\variable
+    newEvent     = "Event_" + displayName
+    currentEvent = FormWindows()\event_proc
     
-    FindSearchString$ = "Procedure " + FormWindows()\event_proc
-
+  ElseIf FindString(ConstantValue, "#")
+    ChangeCurrentElement(FormWindows()\Formmenus(), lastmenuselected) ;FormWindows()\Formmenus()\lastmenuselected don't work
+    dblClickFormObject = "menu"
+    displayName  = MenuBarCellName
+    newEvent     = "Event_" + "m" + MenuBarCellName
+    currentEvent = FormWindows()\Formmenus()\event
+    
+  ElseIf ListSize(ObjList()) > 1
+    dblClickFormObject = "gadget"
+    ChangeCurrentElement(FormWindows()\FormGadgets(), FormWindows()\lastgadgetselected)
+    If FindString(FormWindows()\FormGadgets()\variable, FormWindows()\variable) = 0
+      FormWindows()\FormGadgets()\variable = FormWindows()\variable + "_" + FormWindows()\FormGadgets()\variable
+      grid_SetCellString(propgrid, 2, 2, FormWindows()\FormGadgets()\variable)
+    EndIf
+    displayName  = ReplaceString(FormWindows()\FormGadgets()\variable, FormWindows()\variable + "_", "")
+    newEvent     = "Event_" + FormWindows()\FormGadgets()\variable
+    currentEvent = FormWindows()\FormGadgets()\event_proc
+  EndIf
+  
+  If dblClickFormObject = "" : ProcedureReturn : EndIf
+  
+  If currentEvent = ""
+    If FormAutoProcName = #False And MessageRequester(#ProductName$,
+                                                      LanguagePattern("Form",
+                                                                      "ProcAutoName", "%proc%", displayName), #PB_MessageRequester_YesNo) = #PB_MessageRequester_No
+      ProcedureReturn
+    EndIf
+    EventName = newEvent
+  Else
+    EventName = currentEvent
+  EndIf
+  
+  Select dblClickFormObject
+    Case "menu"  
+      If CreateBindEvent = #False: FormWindows()\FormMenus()\event = EventName: EndIf
+    Case "window" 
+      If CreateBindEvent = #False: FormWindows()\event_proc = EventName: EndIf
+      FormWindows()\caption = displayName
+      
+    Case "gadget" 
+      If CreateBindEvent = #False: FormWindows()\FormGadgets()\event_proc = EventName: EndIf
+      If FormWindows()\FormGadgets()\caption = ""
+        FormWindows()\FormGadgets()\caption = displayName
+      EndIf
+      
+      If FormWindows()\FormGadgets()\lastvariable = ""
+        FormWindows()\FormGadgets()\lastvariable = FormWindows()\FormGadgets()\variable
+      EndIf      
+  EndSelect
+  
+  ; now the right variable is select
+  
+  TextToInsert$ = ""
+  
+  If FormWindows()\variable  
+    FindSearchString$ = "Procedure " + FormWindows()\variable + "("
+    ; Create Form Event
     If FindProcedure(FindSearchString$) = #False
-        FindNoFormEvent = #True
-        TextToInsert$ = "Procedure " + FormWindows()\event_proc + "(Event, Window)" + #Endline
-        TextToInsert$ + "  If Event = #PB_Event_SizeWindow" + #Endline
-        TextToInsert$ + "    Resize_" + FormWindows()\variable + "()" + #Endline
-        TextToInsert$ + "  EndIf" + #Endline
-        TextToInsert$ +"EndProcedure" + #Endline + #Endline
-        SendEditorMessage(#SCI_DOCUMENTEND)
-        *UTF8Buffer = UTF8(TextToInsert$)
-        If *UTF8Buffer
-            SendEditorMessage(#SCI_REPLACESEL, 0, *UTF8Buffer)
-            FreeMemory(*UTF8Buffer)
-        EndIf
+      If CreateBindEvent = #False
+        TextToInsert$+ "Procedure " + FormWindows()\variable + "(Event, Window)" + #Endline
+        TextToInsert$+ "  If Event = #PB_Event_SizeWindow" + #Endline
+        TextToInsert$+ "    Resize_" + FormWindows()\variable + "()" + #Endline
+        TextToInsert$+ "  EndIf" + #Endline
+        TextToInsert$+"EndProcedure" + #Endline + #Endline
+      EndIf
+    EndIf
+    
+    FindSearchString$ = "Procedure CloseWindow_" + FormWindows()\variable + "()"
+    If FindProcedure(FindSearchString$) = #False
+      TextToInsert$+ "Procedure CloseWindow_" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "  If EventWindow() = " + FormWindows()\variable + #Endline
+      TextToInsert$+ ";   SaveWindowPos" +  FormWindows()\variable + "()" + #EndLine
+      TextToInsert$+ "    CloseWindow(" + FormWindows()\variable + ")" + #Endline
+      TextToInsert$+ "  EndIf" + #Endline
+      TextToInsert$+ "EndProcedure" + #Endline + #Endline
     EndIf
   EndIf
   
   ;write the procedure Gadget Handler
-  If dbprocname<>""
-    SendEditorMessage(#SCI_DOCUMENTEND)
-    SendEditorMessage(#SCI_SCROLLCARET)
+  FindSearchString$ = "Procedure OpenWindow" + FormWindows()\variable + "()"
+  If FindProcedure(FindSearchString$) = #False
+    If CreateBindEvent = #False
+      TextToInsert$+ "Procedure OpenWindow" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "  Open" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ #Endline        
+      TextToInsert$+ "OpenWindow" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "; ---- Main Loop" + #Endline
+      TextToInsert$+ "CompilerIf #PB_Compiler_IsMainFile" + #Endline
+      TextToInsert$+ "  Repeat" + #Endline
+      TextToInsert$+ "    If IsWindow(" +  FormWindows()\variable + ")" + #Endline
+      TextToInsert$+ "       event = WaitWindowEvent()" + #Endline
+      TextToInsert$+ "       If EventWindow() = " + FormWindows()\variable + #Endline
+      TextToInsert$+ "       " + #Endline
+      TextToInsert$+ "       EndIf" + #Endline
+      TextToInsert$+ "    Else" + #Endline
+      TextToInsert$+ "       End" + #Endline
+      TextToInsert$+ "    EndIf" + #Endline
+      TextToInsert$+ "   ForEver" + #Endline
+      TextToInsert$+ "EndProcedure" + #Endline
+      TextToInsert$+ "OpenWindow" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "CompilerEndIf" + #Endline
+    Else
+      
+      TextToInsert$+ "Procedure OpenWindow" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "  Open" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "  BindEvent(#PB_Event_SizeWindow, @Resize_" + FormWindows()\variable + "())" + #Endline
+      TextToInsert$+ "  BindEvent(#PB_Event_CloseWindow, @CloseWindow_" + FormWindows()\variable + "())" + #Endline
+      TextToInsert$+ "EndProcedure" + #Endline  
+      TextToInsert$+ #Endline
+      TextToInsert$+ "CompilerIf #PB_Compiler_IsMainFile" + #Endline
+      TextToInsert$+ "OpenWindow" + FormWindows()\variable + "()" + #Endline
+      TextToInsert$+ "; ---- Main Loop" + #Endline
+      TextToInsert$+ "  Repeat" + #Endline
+      TextToInsert$+ "    If IsWindow(" +  FormWindows()\variable + ")" + #Endline
+      TextToInsert$+ "       event = WaitWindowEvent()" + #Endline
+      TextToInsert$+ "       If EventWindow() = " + FormWindows()\variable + #Endline
+      TextToInsert$+ "       " + #Endline
+      TextToInsert$+ "       EndIf" + #Endline
+      TextToInsert$+ "    Else" + #Endline
+      TextToInsert$+ "       End" + #Endline
+      TextToInsert$+ "    EndIf" + #Endline
+      TextToInsert$+ "   ForEver" + #Endline
+      TextToInsert$+ "CompilerEndIf" + #Endline
+      
+    EndIf
+    FirstOpenWindowEntry = #True  
+  EndIf
+
+  If EventName <> ""
+    FindSearchString$ = "Procedure OpenWindow" + FormWindows()\variable + "()"
+    If FindProcedure(FindSearchString$) = #True ; Find And Jump zo FindProcedure
+      SendEditorMessage(#SCI_LINEUP, 0, 0)
+    EndIf
 
     ;Find the Gadget Procedure and jump
     If *ActiveSource <> *ProjectInfo
-      FindSearchString$ = dbprocname
+      
+      FindSearchString$ = EventName + "(" ;Procedure for Gadgets
       
       If FindProcedure(FindSearchString$) = #False
-        TextToInsert$ = "Procedure " + dbprocname + "(EventType)" + #Endline + #Endline + "EndProcedure" + #Endline + #Endline
-        SendEditorMessage(#SCI_DOCUMENTEND)
+        
+        If FirstOpenWindowEntry = #False 
+          If CreateBindEvent = #False
+            TextToInsert$+ "Procedure " + EventName + "(EventType)" + #Endline + #Endline + "EndProcedure" + #Endline + #Endline
+          Else
+            TextToInsert$+ "Procedure " + EventName + "()" + #Endline + #Endline + "EndProcedure" + #Endline + #Endline
+          EndIf
+        Else ;True
+          If CreateBindEvent = #False
+            TextToInsert$ = "XIncludeFile " + Chr(34) + FileName$ + ".pbf" + Chr(34) + #EndLine + #Endline +
+                            "Procedure " + EventName + "(EventType)" + #Endline + #Endline +
+                            "EndProcedure" + #Endline + #Endline + 
+                            TextToInsert$
+          Else
+            TextToInsert$ = "XIncludeFile " + Chr(34) + FileName$ + ".pbf" + Chr(34) + #EndLine + #Endline +
+                            "Procedure " + EventName + "()" + #Endline + #Endline +
+                            "EndProcedure" + #Endline + #Endline + 
+                            TextToInsert$ + #Endline
+          EndIf
+        EndIf
 
         *UTF8Buffer = UTF8(TextToInsert$)
         If *UTF8Buffer
           SendEditorMessage(#SCI_REPLACESEL, 0, *UTF8Buffer)
           FreeMemory(*UTF8Buffer)
         EndIf
+        
+        If ListSize(ObjList()) > 1
+			If FindProcedure("BindGadgetEvent(" + FormWindows()\FormGadgets()\variable) = #False
+			  FindProcedure("Open" + FormWindows()\variable + "()") ; jump to OpenFormname
+			  SendEditorMessage(#SCI_LINEDOWN, 0, 0)
+			  ;SendEditorMessage(#SCI_NEWLINE)
+			  TextToInsert$ = "  BindGadgetEvent(" + FormWindows()\FormGadgets()\variable + ", @" + EventName + "(), #PB_All)" + #EndLine
+			  *UTF8Buffer = UTF8(TextToInsert$)
+			  If *UTF8Buffer
+				SendEditorMessage(#SCI_REPLACESEL, 0, *UTF8Buffer)
+				FreeMemory(*UTF8Buffer)
+			  EndIf          
+			EndIf
+		EndIf
         SendEditorMessage(#SCI_SETSEL, 0, 0)
-        FindProcedure(FindSearchString$) ; jump to new procedure line
+        FindProcedure(EventName + "(") ; jump to new procedure line
         SendEditorMessage(#SCI_VCHOME)
         SendEditorMessage(#SCI_NEWLINE)
-      Else
-        SendEditorMessage(#SCI_VCHOME)
-        SendEditorMessage(#SCI_LINEDOWN, 0, 0)
+      Else ; --- jump to procedure
+           ; --- change the procedurename with variablename
+        If FormGadgetsChangeVariable = #True  
+          
+          FindProcedure(FindSearchString$) ;jump to the procedure
+          SendEditorMessage(#SCI_VCHOME)
+          SendEditorMessage(#SCI_LINEDOWN, 0, 0)          
+        Else
+          SendEditorMessage(#SCI_VCHOME)
+          SendEditorMessage(#SCI_LINEDOWN, 0, 0)
+        EndIf  
       EndIf
     EndIf
   EndIf
-
+  
 EndProcedure
 
 Procedure FD_LeftUp(x,y)
