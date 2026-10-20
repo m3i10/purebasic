@@ -5,6 +5,9 @@
 ; --------------------------------------------------------------------------------------------
 UseJPEGImageDecoder()
 UsePNGImageDecoder()
+UseGIFImageDecoder()
+UseTGAImageDecoder()
+UseTIFFImageDecoder()
 
 Global P_WinHeight, P_Status, P_Menu, P_Toolbar, P_Font.s, P_FontSize, P_FontSizeL
 Global P_FontGadget.s, P_FontGadgetSize, P_FontMenu.s, P_FontMenuSize, P_FontColumn.s, P_FontColumnSize, P_FontGrid.s
@@ -358,9 +361,11 @@ Declare FD_UpdateCode()
 Declare FD_CutEvent()
 Declare FD_CopyEvent()
 Declare FD_PasteEvent()
+Declare FD_GridClipboardEvent(*grid, MenuID)
 Declare FD_DuplicateGadget()
 Declare FD_Open(file.s,update = 0)
 Declare FD_PrepareTestCode(compile = 1)
+Declare FD_ProcessMenuEvent(menu_event)
 
 ; Version Warnings Preference Items
 EnumerationBinary 

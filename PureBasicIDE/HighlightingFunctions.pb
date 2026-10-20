@@ -26,75 +26,6 @@ CreateRegularExpression(#REGEX_FloatNumber, "^[\+\-]?[0-9]+\.[0-9]*$")
 CreateRegularExpression(#REGEX_ScienceNumber, "^[\+\-]?[0-9]+\.?[0-9]*[eE][\+\-]?[0-9]+$")
 
 
-; Retrieve the boundary of a word (start index and end index from a buffer, given the
-; position in the buffer)
-;
-; NOTE: When modifying this function, be sure to report to standalone debugger
-;
-Procedure GetWordBoundary(*Buffer, BufferLength, Position, *StartIndex.INTEGER, *EndIndex.INTEGER, Mode)
-  *WordStart.Character = *Buffer
-  *WordEnd.Character   = *Buffer + BufferLength * #CharSize
-  
-  If Position >= 0 And Position < BufferLength+#CharSize And (Mode = 1 Or Position <= BufferLength)
-    *Cursor.Character = *Buffer + Position*#CharSize
-    
-    If Mode = 1 ; Needed for Auto-complete
-      *Cursor-#CharSize
-    ElseIf ValidCharacters(*Cursor\c) = 0 ; Needed, so F1 help works nicely
-      *Cursor-#CharSize
-    EndIf
-    
-    While *Cursor >= *Buffer
-      If ValidCharacters(*Cursor\c) = 0 And (Mode = 0 Or (*Cursor\c <> '#' And *Cursor\c <> '*'))
-        *WordStart = *Cursor + #CharSize
-        Break
-      EndIf
-      *Cursor - #CharSize
-      Found = 1
-    Wend
-    
-    *Cursor.Character = *Buffer + Position*#CharSize
-    While *Cursor\c
-      If ValidCharacters(*Cursor\c) = 0 And *Cursor\c <> '$'
-        *WordEnd = *Cursor - #CharSize
-        Break
-      EndIf
-      *Cursor + #CharSize
-      Found = 1
-    Wend
-    
-    ; Special case: "var1*var2" is detected as one word! (also handle 1*2*3*4*word correctly)
-    If Found
-      Repeat
-        *Cursor = FindMemoryCharacter(*WordStart+#CharSize, (*WordEnd - *WordStart) / #CharSize - 1, '*')
-        If *Cursor
-          If *Cursor <= *Buffer + Position*#CharSize ; the cursor is on the second word
-            *WordStart = *Cursor+#CharSize
-          ElseIf *Cursor < *WordEnd ; cursor on the first word
-            *WordEnd = *Cursor
-          EndIf
-        EndIf
-      Until *Cursor = 0
-      
-      ; Another special case: *#CONSTANT (https://www.purebasic.fr/english/viewtopic.php?f=4&t=40104)
-      *NextCharacter.Character = *WordStart+#CharSize
-      If *WordStart\c = '*' And *NextCharacter\c = '#'
-        *WordStart+1
-      EndIf
-    EndIf
-  EndIf
-  
-  CompilerIf #PB_Compiler_Unicode
-    *StartIndex\i = (*WordStart - *Buffer)/#CharSize
-    *EndIndex\i   = (*WordEnd   - *Buffer)/#CharSize
-  CompilerElse
-    *StartIndex\i = *WordStart - *Buffer
-    *EndIndex\i   = *WordEnd   - *Buffer
-  CompilerEndIf
-  
-  ProcedureReturn Found
-EndProcedure
-
 Procedure.s GetWord(*Buffer, BufferLength, Position)
   
   If GetWordBoundary(*Buffer, BufferLength, Position, @StartIndex, @EndIndex, 0)
@@ -380,6 +311,19 @@ Procedure.s GetNumber(Line$, Position) ; position is 0-based
 EndProcedure
 
 
+; Expand the folds hiding any of these lines (0-based), before changing them in one undo action.
+; Changing a hidden line expands its fold in the middle of the change (#SCN_NEEDSHOWN), and the
+; highlighting done then toggles #SCI_SETUNDOCOLLECTION, which ends the undo action. The change
+; could then only be undone line by line.
+;
+Procedure EnsureLinesVisible(FirstLine, LastLine)
+  For Line = FirstLine To LastLine
+    If SendEditorMessage(#SCI_GETLINEVISIBLE, Line, 0) = 0
+      SendEditorMessage(#SCI_ENSUREVISIBLE, Line, 0)
+    EndIf
+  Next Line
+EndProcedure
+
 Procedure InsertComments()
   
   If *ActiveSource\IsCode = 0
@@ -392,6 +336,7 @@ Procedure InsertComments()
     LineEnd - 1
   EndIf
   
+  EnsureLinesVisible(LineStart-1, LineEnd-1)
   SendEditorMessage(#SCI_BEGINUNDOACTION, 0, 0)
   For index = LineStart-1 To LineEnd-1
     SetLine(index, "; " + GetLine(index))
@@ -421,6 +366,7 @@ Procedure RemoveComments()
     LineEnd - 1
   EndIf
   
+  EnsureLinesVisible(LineStart-1, LineEnd-1)
   SendEditorMessage(#SCI_BEGINUNDOACTION, 0, 0)
   For index = LineStart-1 To LineEnd-1
     Line$ = GetLine(index)
@@ -463,6 +409,7 @@ Procedure InsertTab()
     Add$ = Space(TabLength)
   EndIf
   
+  EnsureLinesVisible(LineStart-1, LineEnd-1)
   SendEditorMessage(#SCI_BEGINUNDOACTION, 0, 0)
   For index = LineStart-1 To LineEnd-1
     SetLine(index, Add$ + GetLine(index))
@@ -494,6 +441,7 @@ Procedure RemoveTab()
     LineEnd - 1
   EndIf
   
+  EnsureLinesVisible(LineStart-1, LineEnd-1)
   SendEditorMessage(#SCI_BEGINUNDOACTION, 0, 0)
   For index = LineStart-1 To LineEnd-1
     Line$ = GetLine(index)
@@ -1317,6 +1265,12 @@ Procedure.s GenerateQuickHelpText(Line$, Word$, Line, Column)
         ProcedureReturn *ProtoItem\Name$ + *ProtoItem\Prototype$
       EndIf
     EndIf
+  EndIf
+  
+  ; Fields and methods can be named like a function or keyword, so no help for them
+  ;
+  If IsInsideStructureBlock(line) And IsStructureBlockKeyword(Word$, 0, 0) = #False
+    ProcedureReturn ""
   EndIf
   
   ; Use the old routine to check for PB functions and other stuff

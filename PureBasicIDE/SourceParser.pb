@@ -1459,6 +1459,16 @@ Procedure ScanBuffer(*Parser.ParserData, *Buffer, Length, LineOffset, LastLine, 
         length  = Len(BasicKeywords(k))
         compare = CompareMemoryString(ToAscii(BasicKeywords(k)), *Cursor, 1, length, #PB_Ascii)  ; Case insensitive compare
         
+        If compare = 0 And (k = #KEYWORD_Array Or k = #KEYWORD_List Or k = #KEYWORD_Map)
+          ; The Array, List and Map keywords are always followed by a name. Followed by a '(', it is
+          ; an array, list or map named like the keyword (ie: 'NewList List.s()'), so scan it as a normal word
+          *Next.BYTE = *Cursor + length
+          Parser_SkipSpace(*Next)
+          If *Next\b = '('
+            Break
+          EndIf
+        EndIf
+        
         If compare = 0 And (ValidCharacters(PeekA(*Cursor + length)) = 0 Or PeekB(*Cursor + length) = '$') ; if the compare=0, then we have at least length chars left
           
           ; found a keyword here
@@ -2003,6 +2013,37 @@ Procedure FullSourceScan(*Source.SourceFile)
   ProcedureReturn #True ; this is always seen as a source modification (as we delete all old list)
 EndProcedure
 
+; Scan the code generated from a form in design view, as its editor gadget is only updated in code view
+; (so its gadgets, windows and constants are known to AutoComplete in the other sources)
+Procedure FormSourceScan(*Source.SourceFile)
+  If *Source\IsForm = 0
+    ProcedureReturn #False
+  EndIf
+  
+  PushListPosition(FormWindows())
+  ChangeCurrentElement(FormWindows(), *Source\IsForm)
+  Code$ = FD_SelectCode(1, 0)
+  PopListPosition(FormWindows())
+  
+  ; free any old data
+  FreeSourceItemArray(@*Source\Parser)
+  
+  *Source\Parser\SourceItemCount = CountString(Code$, #LF$) + 1
+  *Source\Parser\SourceItemSize  = *Source\Parser\SourceItemCount + 20 ; allocate for a few extra lines
+  *Source\Parser\SourceItemArray = AllocateMemory(*Source\Parser\SourceItemSize * SizeOf(ParsedLine))
+  
+  If *Source\Parser\SourceItemArray
+    *Buffer = UTF8(Code$) ; has the NULL at the end needed by ScanBuffer()
+    If *Buffer
+      ScanBuffer(@*Source\Parser, *Buffer, MemorySize(*Buffer) - 1, 0, *Source\Parser\SourceItemCount-1, #False)
+      FreeMemory(*Buffer)
+    EndIf
+    SortParserData(@*Source\Parser) ; no *Source, as the editor gadget doesn't hold this code
+  EndIf
+  
+  ProcedureReturn #True
+EndProcedure
+
 Procedure PartialSourceScan(*Source.SourceFile, StartLine, EndLine)
   Result = #False
   
@@ -2113,6 +2154,24 @@ Procedure Parser_AddSorted(*Tree.RadixTree, *Item.SourceItem, Line)
   *Item\SortedLine = Line
   
   RadixInsert(*Tree, *Item\Name$, *Item)
+  
+EndProcedure
+
+; Same as Parser_AddSorted(), but a typed definition replaces an untyped one with the same name,
+; so an earlier untyped use (ie: 'Status\Field = 0' before 'Global Status.StatusType') doesn't hide the type
+;
+Procedure Parser_AddSortedVariable(*Tree.RadixTree, *Item.SourceItem, Line)
+  
+  *Node.RadixNode = RadixFindPrefix(*Tree, *Item\Name$, #True)
+  If *Node And *Node\Value
+    *Sorted.SourceItem = *Node\Value
+    If StringField(*Sorted\Type$, 1, Chr(10)) = "" And StringField(*Item\Type$, 1, Chr(10)) <> ""
+      *Item\SortedLine = Line
+      *Node\Value = *Item
+    EndIf
+  Else
+    Parser_AddSorted(*Tree, *Item, Line)
+  EndIf
   
 EndProcedure
 
@@ -2278,7 +2337,7 @@ Procedure SortParserData(*Parser.ParserData, *Source.SourceFile=0)
           
         Case #ITEM_Variable, #ITEM_Array, #ITEM_LinkedList, #ITEM_Map
           If *Item\Scope = #SCOPE_GLOBAL Or *Item\Scope = #SCOPE_THREADED Or *Item\Scope = #SCOPE_SHARED Or InProcedure = 0 Or InImport
-            Parser_AddSorted(@*CurrentModule\Indexed[*Item\Type], *Item, Line)
+            Parser_AddSortedVariable(@*CurrentModule\Indexed[*Item\Type], *Item, Line)
           EndIf
           
         Case #ITEM_Keyword

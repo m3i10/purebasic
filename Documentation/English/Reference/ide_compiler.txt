@@ -245,7 +245,7 @@ MacOS X: The icon must be in ICNS format (Macintosh Icon). To create such an ico
 @LineBreak
 @LineBreak
 
-@Bold "Enable DPI Aware Executable" (Windows only)
+@Bold "Enable DPI Aware Executable"
 @LineBreak
   This option enable DPI awareness when creating an executable. That means than GUI created in PureBasic
   will scale automatically if the DPI of the screen is above 100%. Most of the process is seamless, but some
@@ -258,6 +258,15 @@ MacOS X: The icon must be in ICNS format (Macintosh Icon). To create such an ico
 @LineBreak
   Enable DLL preloading protection to the executable. It prevents that system DLLs are first searched for in the program directory
   instead of in the System32 directory of the Windows operating system.
+
+@LineBreak
+@LineBreak
+
+@Bold "Use shared UCRT (Windows 10 and above)" (Windows only)
+@LineBreak
+  Uses the dynamic universal CRT (UCRT) of Windows when creating the executable or DLL. It is recommended when the executable
+  or DLL doesn't need to support Windows versions older than Windows 10. The resulting executable or DLL will be smaller and
+  will get automatic security fixes from the CRT when Microsoft updates it. This option is always enabled on PureBasic for Windows arm64.
 
 @LineBreak
 @LineBreak

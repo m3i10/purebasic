@@ -23,6 +23,7 @@ Global AutoComplete_IsModule
 Global AutoComplete_ModuleStart
 Global AutoComplete_StartColumn
 Global AutoComplete_AutoPopup ; the window was opened by the auto-popup (not by the AutoComplete shortcut)
+Global AutoComplete_InStructure ; inside a Structure or Interface block: no functions and only the keywords allowed there
 
 Global AutoCompleteTree.RadixTree       ; indexes AutoCompleteList() for fast prefix access and ordering
 Global NewList *AutoCompleteItems()     ; for temp storage while enumerating only
@@ -170,6 +171,18 @@ EndProcedure
 
 Procedure AutoComplete_AddItem(*Item.SourceItem)
   Entry$ = *Item\Name$
+  
+  If AutoComplete_InStructure
+    Select *Item\Type
+      Case #ITEM_Procedure, #ITEM_Declare, #ITEM_Import
+        ProcedureReturn
+        
+      Case #ITEM_Macro
+        If FindString(*Item\Prototype$, "(") ; function macro
+          ProcedureReturn
+        EndIf
+    EndSelect
+  EndIf
   
   If AutoCompleteAddBrackets
     Select *Item\Type
@@ -407,6 +420,10 @@ Procedure AutoComplete_FillNormal(WordStart$, ModulePrefix$, EnclosingFunction$,
     If AutocompletePBOptions(#PBITEM_Keyword) And SingleModuleOnly = #False
       If RadixFindRange(BasicKeywordsTree, WordStart$, @FirstMatch, @LastMatch)
         For i = FirstMatch To LastMatch ; tree does not store "index+1"
+          If AutoComplete_InStructure And IsStructureBlockKeyword(BasicKeywordsReal(i), 0, 0) = #False
+            Continue
+          EndIf
+          
           If AutoCompleteAddSpaces
             AutoComplete_AddEntry(BasicKeywordsReal(i) + BasicKeywordsSpaces(i))
           Else
@@ -424,7 +441,7 @@ Procedure AutoComplete_FillNormal(WordStart$, ModulePrefix$, EnclosingFunction$,
       EndIf
     EndIf
     
-    If AutocompletePBOptions(#PBITEM_Function) And SingleModuleOnly = #False
+    If AutocompletePBOptions(#PBITEM_Function) And SingleModuleOnly = #False And AutoComplete_InStructure = #False
       If RadixFindRange(BasicFunctionsTree, WordStart$, @FirstMatch, @LastMatch)
         For i = FirstMatch-1 To LastMatch-1 ; tree stores index+1
           If AutoCompleteAddBrackets
@@ -440,7 +457,7 @@ Procedure AutoComplete_FillNormal(WordStart$, ModulePrefix$, EnclosingFunction$,
       EndIf
     EndIf
     
-    If AutocompletePBOptions(#PBITEM_APIFunction) And SingleModuleOnly = #False
+    If AutocompletePBOptions(#PBITEM_APIFunction) And SingleModuleOnly = #False And AutoComplete_InStructure = #False
       If RadixFindRange(APIFunctionsTree, WordStart$, @FirstMatch, @LastMatch)
         For i = FirstMatch-1 To LastMatch-1 ; tree stores index+1
           If AutoCompleteAddBrackets
@@ -840,6 +857,17 @@ Procedure.s AutoComplete_IsOffsetOf(Line$, Column)
   ProcedureReturn ""
 EndProcedure
 
+; An exact single match is not displayed, except a keyword with an 'End' keyword (like Module), so the matching
+; 'End' keyword can still be added, like for the keywords that have other matches (like Procedure)
+;
+Procedure AutoComplete_HideExactMatch(Word$)
+  If AutoCompleteAddEndKeywords And AutoComplete_IsStructure = 0 And BasicKeywordsEndKeywords(IsBasicKeyword(Word$)) <> ""
+    ProcedureReturn #False
+  EndIf
+  
+  ProcedureReturn #True
+EndProcedure
+
 Procedure OpenAutoCompleteWindow(AutoPopup = #False)
   ;
   ; Note: We have a problem here:
@@ -995,6 +1023,8 @@ Procedure OpenAutoCompleteWindow(AutoPopup = #False)
     
     AutoComplete_Clear()
     
+    AutoComplete_InStructure = IsInsideStructureBlock(*ActiveSource\CurrentLine-1)
+    
     If AutoComplete_IsStructure
       AutoComplete_FillStructured(WordStart$, StructName$, *BaseItem, BaseItemLine)
     ElseIf WordStart$ <> "" Or AutoComplete_IsModule
@@ -1022,7 +1052,7 @@ Procedure OpenAutoCompleteWindow(AutoPopup = #False)
         ;
         If ListSize(*AutoCompleteDisplay()) = 1 And WordStart$
           FirstElement(*AutoCompleteDisplay())
-          If CompareMemoryString(*AutoCompleteDisplay(), @WordStart$, 1) = 0
+          If CompareMemoryString(*AutoCompleteDisplay(), @WordStart$, 1) = 0 And AutoComplete_HideExactMatch(WordStart$)
             AutoCompleteWindowOpen = 0
             ProcedureReturn
           EndIf
@@ -1350,7 +1380,7 @@ Procedure AutoComplete_WordUpdate(IsInitial=#False)
     ;
     If ListSize(*AutoCompleteDisplay()) = 1
       FirstElement(*AutoCompleteDisplay())
-      If Word$ <> "" And CompareMemoryString(*AutoCompleteDisplay(), @Word$, 1) = 0
+      If Word$ <> "" And CompareMemoryString(*AutoCompleteDisplay(), @Word$, 1) = 0 And AutoComplete_HideExactMatch(Word$)
         AutoComplete_Close()
         ProcedureReturn
       EndIf

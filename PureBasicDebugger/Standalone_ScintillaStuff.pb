@@ -7,76 +7,6 @@
 
 CompilerIf #CompileWindows | #CompileLinux | #CompileMac
   
-  ; Retrieve the boundary of a word (start index and end index from a buffer, given the
-  ; position in the buffer)
-  ;
-  ; NOTE: When modifying this function, be sure to report to the IDE
-  ;
-  Procedure GetWordBoundary(*Buffer, BufferLength, Position, *StartIndex.INTEGER, *EndIndex.INTEGER, Mode)
-    *WordStart.Character = *Buffer
-    *WordEnd.Character   = *Buffer + BufferLength
-    
-    If Position >= 0 And Position < BufferLength+#CharSize And (Mode = 1 Or Position <= BufferLength)
-      *Cursor.Character = *Buffer + Position*#CharSize
-      
-      If Mode = 1 ; Needed for Auto-complete
-        *Cursor-#CharSize
-      ElseIf ValidCharacters(*Cursor\c) = 0 ; Needed, so F1 help works nicely
-        *Cursor-#CharSize
-      EndIf
-      
-      While *Cursor >= *Buffer
-        If ValidCharacters(*Cursor\c) = 0 And (Mode = 0 Or (*Cursor\c <> '#' And *Cursor\c <> '*'))
-          *WordStart = *Cursor + #CharSize
-          Break
-        EndIf
-        *Cursor - #CharSize
-        Found = 1
-      Wend
-      
-      *Cursor.Character = *Buffer + Position*#CharSize
-      While *Cursor\c
-        If ValidCharacters(*Cursor\c) = 0 And *Cursor\c <> '$'
-          *WordEnd = *Cursor - #CharSize
-          Break
-        EndIf
-        *Cursor + #CharSize
-        Found = 1
-      Wend
-      
-      ; Special case: "var1*var2" is detected as one word! (also handle 1*2*3*4*word correctly)
-      If Found
-        Repeat
-          *Cursor = FindMemoryCharacter(*WordStart+#CharSize, *WordEnd-*WordStart-1, '*')
-          If *Cursor
-            If *Cursor <= *Buffer + Position*#CharSize ; the cursor is on the second word
-              *WordStart = *Cursor+#CharSize
-            ElseIf *Cursor < *WordEnd ; cursor on the first word
-              *WordEnd = *Cursor
-            EndIf
-          EndIf
-        Until *Cursor = 0
-        
-        ; Another special case: *#CONSTANT (https://www.purebasic.fr/english/viewtopic.php?f=4&t=40104)
-        *NextCharacter.Character = *WordStart+#CharSize
-        If *WordStart\c = '*' And *NextCharacter\c = '#'
-          *WordStart+1
-        EndIf
-      EndIf
-    EndIf
-    
-    CompilerIf #PB_Compiler_Unicode
-      *StartIndex\i = (*WordStart - *Buffer)/#CharSize
-      *EndIndex\i   = (*WordEnd   - *Buffer)/#CharSize
-    CompilerElse
-      *StartIndex\i = *WordStart - *Buffer
-      *EndIndex\i   = *WordEnd   - *Buffer
-    CompilerEndIf
-    
-    ProcedureReturn Found
-  EndProcedure
-  
-  
   Procedure.s GetLine(EditorGadget, Index)
     
     range.TextRange\chrg\cpMin = ScintillaSendMessage(EditorGadget, #SCI_POSITIONFROMLINE, Index, 0)
@@ -176,21 +106,8 @@ CompilerIf #CompileWindows | #CompileLinux | #CompileMac
             line      = ScintillaSendMessage(EditorGadget, #SCI_LINEFROMPOSITION, *scinotify\position, 0)
             linestart = ScintillaSendMessage(EditorGadget, #SCI_POSITIONFROMLINE, line, 0)
             Line$     = GetLine(EditorGadget, line)
-            
-            If Line$ <> "" And GetWordBoundary(@Line$, Len(Line$), *scinotify\position - linestart, @selStart, @selEnd, 1) ; include * or #
-              If Mid(Line$, selEnd+2, 2) = "()"
-                selEnd + 2
-              EndIf
-              If Mid(Line$, selEnd+2, 2) = "()"
-                selEnd + 2
-              EndIf
-              If Mid(Line$, selStart, 1) = "$" Or Mid(Line$, selStart, 1) = "%"
-                selStart-1
-              EndIf
-              
-              Expr$ = Mid(Line$, selStart+1, selEnd - selStart + 1)
-              IsVariableExpression = 1
-            EndIf
+            Expr$     = GetDebuggerTooltipExpression(Line$, *scinotify\position - linestart)
+            IsVariableExpression = 1
           EndIf
           
           ; Evaluate if there is a debugger...

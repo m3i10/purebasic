@@ -4,6 +4,49 @@
 ;  See LICENSE and LICENSE-FANTAISIE in the project root for license information.
 ; --------------------------------------------------------------------------------------------
 
+; Converts a menu shortcut like "Ctrl+Shift+S", "+" or "Ctrl+-" to its #PB_Shortcut_ constants
+Procedure.s FD_ShortcutConstants(shortcut.s)
+  Protected result.s, key.s, modifier.s, count, i
+
+  shortcut = Trim(shortcut)
+  If Right(shortcut, 1) = "+" ; the '+' key itself, as in "+" or "Ctrl++"
+    key = "+"
+    shortcut = Trim(Left(shortcut, Len(shortcut) - 1))
+    If Right(shortcut, 1) = "+"
+      shortcut = Left(shortcut, Len(shortcut) - 1)
+    EndIf
+    If shortcut <> ""
+      count = CountString(shortcut, "+") + 1
+    EndIf
+  Else
+    count = CountString(shortcut, "+")
+    key = Trim(StringField(shortcut, count + 1, "+"))
+  EndIf
+
+  For i = 1 To count
+    modifier = Trim(StringField(shortcut, i, "+"))
+
+    Select LCase(modifier) ; Use LCase() so it works with CTRL, Ctrl, etc. https://www.purebasic.fr/english/viewtopic.php?f=4&t=71127
+      Case "cmd"
+        modifier = "Command"
+      Case "ctrl"
+        modifier = "Control"
+      Case "strg"
+        modifier = "Control"
+    EndSelect
+
+    result + "#PB_Shortcut_" + modifier + " | "
+  Next
+
+  Select key
+    Case "+"
+      key = "Add"
+    Case "-"
+      key = "Subtract"
+  EndSelect
+
+  ProcedureReturn result + "#PB_Shortcut_" + key
+EndProcedure
 
 Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
   If Not contentonly
@@ -213,7 +256,7 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
   
   If ListSize(Img())
     ;check if image decoder is required
-    jpgdecoder.b = 0 : pngdecoder.b = 0 : tgadecoder.b = 0 : tiffdecoder.b = 0
+    jpgdecoder.b = 0 : pngdecoder.b = 0 : gifdecoder.b = 0 : tgadecoder.b = 0 : tiffdecoder.b = 0
     ForEach Img()
       img.s = LCase(Img()\img)
       If Not jpgdecoder And (FindString(img,"jpg") Or FindString(img,"jpeg"))
@@ -221,6 +264,9 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
       EndIf
       If Not pngdecoder And (FindString(img,"png"))
         pngdecoder = 1
+      EndIf
+      If Not gifdecoder And (FindString(img,"gif"))
+        gifdecoder = 1
       EndIf
       If Not tgadecoder And (FindString(img,"tga"))
         tgadecoder = 1
@@ -236,14 +282,17 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
     If pngdecoder
       content + "UsePNGImageDecoder()" + #Endline
     EndIf
+    If gifdecoder
+      content + "UseGIFImageDecoder()" + #Endline
+    EndIf
     If tgadecoder
-      content + "UseJTAImageDecoder()" + #Endline
+      content + "UseTGAImageDecoder()" + #Endline
     EndIf
     If tiffdecoder
       content + "UseTIFFImageDecoder()" + #Endline
     EndIf
     
-    If jpgdecoder Or pngdecoder Or tgadecoder Or tiffdecoder
+    If jpgdecoder Or pngdecoder Or gifdecoder Or tgadecoder Or tiffdecoder
       content + "" + #Endline
     EndIf
     
@@ -626,11 +675,7 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
                   gadgetvar.s = "#" + FormWindows()\FormGadgets()\variable
                 EndIf
                 
-                If FormWindows()\FormGadgets()\type = #Form_Type_Panel
-                  linevars + "GetGadgetAttribute("+gadgetvar+",#PB_Panel_ItemWidth) - "
-                Else
-                  linevars + "GadgetWidth("+gadgetvar+") - "
-                EndIf
+                linevars + "GadgetWidth("+gadgetvar+") - "
                 tempvalue = FormWindows()\FormGadgets()\x2 - FormWindows()\FormGadgets()\x1
                 PopListPosition(FormWindows()\FormGadgets())
                 
@@ -642,7 +687,7 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
             
             ; y
             If FormWindows()\FormGadgets()\lock_top ;{
-              linevars + codepaddingy + Str(FormWindows()\FormGadgets()\y1)+", "
+              linevars + codepaddingy + Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y1))+", "
             Else
               If FormWindows()\FormGadgets()\parent
                 PushListPosition(FormWindows()\FormGadgets())
@@ -654,22 +699,15 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
                   gadgetvar.s = "#" + FormWindows()\FormGadgets()\variable
                 EndIf
                 
-                If FormWindows()\FormGadgets()\type = #Form_Type_Panel
-                  linevars + codepaddingy + "GetGadgetAttribute("+gadgetvar+",#PB_Panel_ItemHeight) - "
-                Else
-                  linevars + codepaddingy + "GadgetHeight("+gadgetvar+") - "
-                EndIf
+                linevars + codepaddingy + "GadgetHeight("+gadgetvar+") - "
                 
                 tempvalue = FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1
                 
-                If FormWindows()\FormGadgets()\type = #Form_Type_Panel
-                  tempvalue - Panel_Height
-                EndIf
                 PopListPosition(FormWindows()\FormGadgets())
                 
-                linevars + Str(tempvalue - FormWindows()\FormGadgets()\y1) + ", "
+                linevars + Str(DesktopUnscaledY(tempvalue - FormWindows()\FormGadgets()\y1)) + ", "
               Else
-                linevars + codepaddingy + "FormWindowHeight - " + Str(FormWindows()\height - FormWindows()\FormGadgets()\y1)+", "
+                linevars + codepaddingy + "FormWindowHeight - " + Str(DesktopUnscaledY(FormWindows()\height - FormWindows()\FormGadgets()\y1))+", "
               EndIf
             EndIf ;}
             
@@ -685,11 +723,7 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
                   gadgetvar.s = "#" + FormWindows()\FormGadgets()\variable
                 EndIf
                 
-                If FormWindows()\FormGadgets()\type = #Form_Type_Panel
-                  linevars + "GetGadgetAttribute("+gadgetvar+",#PB_Panel_ItemWidth) - "
-                Else
-                  linevars + "GadgetWidth("+gadgetvar+") - "
-                EndIf
+                linevars + "GadgetWidth("+gadgetvar+") - "
                 tempvalue = FormWindows()\FormGadgets()\x2 - FormWindows()\FormGadgets()\x1
                 PopListPosition(FormWindows()\FormGadgets())
                 
@@ -713,23 +747,15 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
                   gadgetvar.s = "#" + FormWindows()\FormGadgets()\variable
                 EndIf
                 
-                If FormWindows()\FormGadgets()\type = #Form_Type_Panel
-                  linevars + "GetGadgetAttribute("+gadgetvar+",#PB_Panel_ItemHeight) - "
-                Else
-                  linevars + "GadgetHeight("+gadgetvar+") - "
-                EndIf
+                linevars + "GadgetHeight("+gadgetvar+") - "
                 tempvalue = FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1
-                
-                If FormWindows()\FormGadgets()\type = #Form_Type_Panel
-                  tempvalue - Panel_Height
-                EndIf
                 
                 PopListPosition(FormWindows()\FormGadgets())
                 
-                linevars + Str(tempvalue - (FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1))
+                linevars + Str(DesktopUnscaledY(tempvalue - (FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1)))
               Else
                 ;- Change height menu and toolbar calc
-                value = FormWindows()\height - (FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1)
+                value = DesktopUnscaledY(FormWindows()\height - (FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1))
                 If FormSkin = #PB_OS_Windows
                   
                   value - bottompaddingsb - toptoolpadding
@@ -753,7 +779,7 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
                 
               EndIf
             Else
-              linevars + Str(FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1)
+              linevars + Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1))
             EndIf ;}
             
             line + Str(DesktopUnscaledX(FormWindows()\FormGadgets()\x1)) + ", " + codepaddingy + Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y1)) + ", " + Str(DesktopUnscaledX(FormWindows()\FormGadgets()\x2 - FormWindows()\FormGadgets()\x1)) + ", " + Str(DesktopUnscaledY(FormWindows()\FormGadgets()\y2 - FormWindows()\FormGadgets()\y1))
@@ -1092,24 +1118,7 @@ Procedure.s FD_SelectCode(contentonly = 0, testcode = 0)
         ForEach FormWindows()\FormMenus()
           If FormWindows()\FormMenus()\shortcut <> ""
             addemptyline = 1
-            
-            If FindString(FormWindows()\FormMenus()\shortcut,"+")
-              mod.s = Trim(StringField(FormWindows()\FormMenus()\shortcut,1,"+"))
-              
-              Select LCase(mod) ; Use LCase() so it works with CTRL, Ctrl, etc. https://www.purebasic.fr/english/viewtopic.php?f=4&t=71127
-                Case "cmd"
-                  mod = "Command"
-                Case "ctrl"
-                  mod = "Control"
-                Case "strg"
-                  mod = "Control"
-              EndSelect
-              
-              shortcut.s = Trim(StringField(FormWindows()\FormMenus()\shortcut,2,"+"))
-              content + "  AddKeyboardShortcut("+ winid + ", #PB_Shortcut_" + mod + " | #PB_Shortcut_" + shortcut + ", " + FormWindows()\FormMenus()\id + ")" + #Endline
-            Else
-              content + "  AddKeyboardShortcut("+ winid + ", #PB_Shortcut_" + FormWindows()\FormMenus()\shortcut + ", " + FormWindows()\FormMenus()\id + ")" + #Endline
-            EndIf
+            content + "  AddKeyboardShortcut("+ winid + ", " + FD_ShortcutConstants(FormWindows()\FormMenus()\shortcut) + ", " + FormWindows()\FormMenus()\id + ")" + #Endline
           EndIf
         Next
         

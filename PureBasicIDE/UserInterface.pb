@@ -635,8 +635,8 @@ Procedure CustomizeTabBarGadget()
   TabBarGadgetInclude\EnableDoubleClickForNewTab = #False
   ;TabBarGadgetInclude\EnableMiddleClickForCloseTab = #False
   
-  TabBarGadgetInclude\ArrowWidth = 18
-  TabBarGadgetInclude\ArrowHeight = 18
+  TabBarGadgetInclude\ArrowWidth = DesktopScaledX(18)
+  TabBarGadgetInclude\ArrowHeight = DesktopScaledY(18)
   
   ; determine colors and font in an OS-specific way
   ;
@@ -654,12 +654,12 @@ Procedure CustomizeTabBarGadget()
     TabBarGadgetInclude\TextColor = $FF<<24 | RGB(*Style\fg[#GTK_STATE_NORMAL]\red >> 8, *Style\fg[#GTK_STATE_NORMAL]\green >> 8, *Style\fg[#GTK_STATE_NORMAL]\blue >> 8)
     
     ; some adjustments to the generally larger fonts on Linux
-    TabBarGadgetInclude\CloseButtonSize = 15
+    TabBarGadgetInclude\CloseButtonSize = DesktopScaledX(15)
   CompilerEndIf
   
   CompilerIf #CompileLinuxQt
     TabBarGadgetInclude\TabBarColor = QT_WindowBackgroundColor(WindowID(#WINDOW_Main))
-    TabBarGadgetInclude\CloseButtonSize = 15
+    TabBarGadgetInclude\CloseButtonSize = DesktopScaledX(15)
   CompilerEndIf
   
   CompilerIf #CompileMac
@@ -825,6 +825,15 @@ Procedure CreateGUI()
   EndIf
   
   GetWindowMetrics()
+  
+  CompilerIf #CompileMac
+    ; Adding the toolbar moves the window down and takes part of its height from the window content,
+    ; so restore the requested position and height, else the window moves down and gets smaller on each start
+    If WindowY(#WINDOW_Main) <> EditorWindowY Or WindowHeight(#WINDOW_Main) <> EditorWindowHeight
+      ResizeWindow(#WINDOW_Main, #PB_Ignore, EditorWindowY, #PB_Ignore, EditorWindowHeight)
+    EndIf
+  CompilerEndIf
+  
   ResizeMainWindow()
   
   ; For the toolpanel auto-hide stuff
@@ -1635,7 +1644,15 @@ Procedure MainMenuEvent(MenuItemID)
             
     Case #MENU_BreakPoint
       UpdateCursorPosition() ; to get the current line
-      Debugger_BreakPoint(*ActiveSource\CurrentLine-1)
+      Line = *ActiveSource\CurrentLine
+      
+      ; When full lines are selected (like with a click on the line numbers), the caret is at the start of the next line
+      GetSelection(@LineStart, 0, @LineEnd, @RowEnd)
+      If Line = LineEnd And LineEnd > LineStart And RowEnd <= 1
+        Line - 1
+      EndIf
+      
+      Debugger_BreakPoint(Line-1)
       
     Case #MENU_BreakClear
       Debugger_ClearBreakPoints()
@@ -1814,7 +1831,9 @@ Procedure MainMenuEvent(MenuItemID)
           If AutoCompleteKeywordInserted And KeyboardShortcuts(#MENU_AutoComplete_OK) = #PB_Shortcut_Return
             AutoComplete_InsertEndKEyword()
           Else
+            SendEditorMessage(#SCI_BEGINUNDOACTION) ; undo the newline and its auto indentation in one step
             SendEditorMessage(#SCI_NEWLINE, 0, 0)
+            SendEditorMessage(#SCI_ENDUNDOACTION)
           EndIf
           
         ; See ProjectInfo_EnterKeyHandler() in ProjectManagement.pb for Linux specific handling of this
@@ -1974,8 +1993,15 @@ Procedure MainWindowEvents(EventID)
   
   If EventID = #PB_Event_ActivateWindow
     If GetActiveWindow() = #WINDOW_Main  ; check if it still got the focus and it is not just a delayed focus event!
-      If *ActiveSource And *ActiveSource <> *ProjectInfo And *ActiveSource\IsForm = 0
-        SetActiveGadget(*ActiveSource\EditorGadget) ; Always give back the focus to the editor when the window gets activated
+      If *ActiveSource And *ActiveSource <> *ProjectInfo
+        If *ActiveSource\IsForm = 0
+          SetActiveGadget(*ActiveSource\EditorGadget) ; Always give back the focus to the editor when the window gets activated
+        Else
+          *Form.FormWindow = *ActiveSource\IsForm
+          If *Form\current_view = 0
+            AddStringShortcuts() ; Restore the 4 string shortcuts in Form Designer design view, removed by #SCN_FOCUSOUT after F5 Compile/Run
+          EndIf
+        EndIf
       EndIf
       FileMonitorEvent()
     EndIf
@@ -2332,12 +2358,7 @@ EndProcedure
 
 Procedure ResizeMainWindow()
   EditorWindowWidth  = WindowWidth(#WINDOW_Main)   ; update the global variables to speed up things like splitter movement
-
-  CompilerIf #CompileMac
-    EditorWindowHeight = WindowHeight(#WINDOW_Main, #PB_Window_FrameCoordinate)
-  CompilerElse
-    EditorWindowHeight = WindowHeight(#WINDOW_Main)
-  CompilerEndIf
+  EditorWindowHeight = WindowHeight(#WINDOW_Main)
   
   If IsWindowMaximized(#WINDOW_Main) = 0 And IsWindowMinimized(#WINDOW_Main) = 0
     Save_EditorX = WindowX(#WINDOW_Main)

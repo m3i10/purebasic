@@ -374,6 +374,11 @@ CompilerEndIf
 ;
 Prototype HighlightCallback(*StringStart.BYTE, Length, *Color, IsBold, TextChanged)
 
+; Optional, setup by the IDE: corrects the case of an interface method called with '\' to the one of
+; its declaration. Returns #True if the text was changed. Without it, such methods are not case corrected
+Prototype InterfaceMethodCaseCallback(*WordStart.BYTE, WordLength)
+Global InterfaceMethodCase.InterfaceMethodCaseCallback
+
 ; For API/BasicFunction array
 Structure FunctionEntry
   Name$        ; name (in correct case)
@@ -857,6 +862,159 @@ CompilerIf Defined(PUREBASIC_DEBUGGER, #PB_Constant) ; only in IDE and debugger
 
   EndProcedure
 
+  ; Word functions, shared by the IDE and the standalone debugger
+  ;
+
+  ; Retrieve the boundary of a word (start index and end index from a buffer, given the
+  ; position in the buffer)
+  ;
+  Procedure GetWordBoundary(*Buffer, BufferLength, Position, *StartIndex.INTEGER, *EndIndex.INTEGER, Mode)
+    *WordStart.Character = *Buffer
+    *WordEnd.Character   = *Buffer + BufferLength * #CharSize
+
+    If Position >= 0 And Position < BufferLength+#CharSize And (Mode = 1 Or Position <= BufferLength)
+      *Cursor.Character = *Buffer + Position*#CharSize
+
+      If Mode = 1 ; Needed for Auto-complete
+        *Cursor-#CharSize
+      ElseIf ValidCharacters(*Cursor\c) = 0 ; Needed, so F1 help works nicely
+        *Cursor-#CharSize
+      EndIf
+
+      While *Cursor >= *Buffer
+        If ValidCharacters(*Cursor\c) = 0 And (Mode = 0 Or (*Cursor\c <> '#' And *Cursor\c <> '*'))
+          *WordStart = *Cursor + #CharSize
+          Break
+        EndIf
+        *Cursor - #CharSize
+        Found = 1
+      Wend
+
+      *Cursor.Character = *Buffer + Position*#CharSize
+      While *Cursor\c
+        If ValidCharacters(*Cursor\c) = 0 And *Cursor\c <> '$'
+          *WordEnd = *Cursor - #CharSize
+          Break
+        EndIf
+        *Cursor + #CharSize
+        Found = 1
+      Wend
+
+      ; Special case: "var1*var2" is detected as one word! (also handle 1*2*3*4*word correctly)
+      If Found
+        Repeat
+          *Cursor = FindMemoryCharacter(*WordStart+#CharSize, (*WordEnd - *WordStart) / #CharSize - 1, '*')
+          If *Cursor
+            If *Cursor <= *Buffer + Position*#CharSize ; the cursor is on the second word
+              *WordStart = *Cursor+#CharSize
+            ElseIf *Cursor < *WordEnd ; cursor on the first word
+              *WordEnd = *Cursor
+            EndIf
+          EndIf
+        Until *Cursor = 0
+
+        ; Another special case: *#CONSTANT (https://www.purebasic.fr/english/viewtopic.php?f=4&t=40104)
+        *NextCharacter.Character = *WordStart+#CharSize
+        If *WordStart\c = '*' And *NextCharacter\c = '#'
+          *WordStart+1
+        EndIf
+      EndIf
+    EndIf
+
+    CompilerIf #PB_Compiler_Unicode
+      *StartIndex\i = (*WordStart - *Buffer)/#CharSize
+      *EndIndex\i   = (*WordEnd   - *Buffer)/#CharSize
+    CompilerElse
+      *StartIndex\i = *WordStart - *Buffer
+      *EndIndex\i   = *WordEnd   - *Buffer
+    CompilerEndIf
+
+    ProcedureReturn Found
+  EndProcedure
+
+  ; Returns the start index of the structure path of a field (ie: 'Var\Field' or 'List()\Sub\Field'),
+  ; so the whole path is evaluated and not a variable with the same name as the field.
+  ; WordStart is the start index of the field name. It is returned unchanged if the word is not a field.
+  ;
+  Procedure GetStructurePathStart(*Buffer, WordStart)
+    *Cursor.Character = *Buffer + (WordStart-1) * #CharSize
+
+    Repeat
+      While *Cursor >= *Buffer And (*Cursor\c = ' ' Or *Cursor\c = 9) ; whitespace
+        *Cursor - #CharSize
+      Wend
+      If *Cursor < *Buffer Or *Cursor\c <> '\'
+        Break
+      EndIf
+      *Cursor - #CharSize
+      While *Cursor >= *Buffer And (*Cursor\c = ' ' Or *Cursor\c = 9) ; whitespace
+        *Cursor - #CharSize
+      Wend
+
+      ; skip the () or [] of a list, map or array
+      If *Cursor >= *Buffer And (*Cursor\c = ')' Or *Cursor\c = ']')
+        CharClose = *Cursor\c
+        If CharClose = ')'
+          CharOpen = '('
+        Else
+          CharOpen = '['
+        EndIf
+        Depth = 0
+        While *Cursor >= *Buffer
+          If *Cursor\c = CharClose
+            Depth + 1
+          ElseIf *Cursor\c = CharOpen
+            Depth - 1
+            If Depth = 0
+              *Cursor - #CharSize
+              Break
+            EndIf
+          EndIf
+          *Cursor - #CharSize
+        Wend
+        If Depth <> 0
+          Break
+        EndIf
+      EndIf
+
+      ; the name before the '\' (none inside a With block)
+      *NameEnd = *Cursor
+      While *Cursor >= *Buffer And ValidCharacters(*Cursor\c)
+        *Cursor - #CharSize
+      Wend
+      If *Cursor = *NameEnd
+        Break
+      EndIf
+      If *Cursor >= *Buffer And *Cursor\c = '*' ; pointer, but not a multiplication
+        *Previous.Character = *Cursor - #CharSize
+        If *Cursor = *Buffer Or ValidCharacters(*Previous\c) = 0
+          *Cursor - #CharSize
+        EndIf
+      EndIf
+      WordStart = (*Cursor + #CharSize - *Buffer) / #CharSize
+    ForEver
+
+    ProcedureReturn WordStart
+  EndProcedure
+
+
+  ; Returns the expression to evaluate for the debugger tooltip of the word at Column in Line$:
+  ; the word including '*' or '#', a '()' after it, a '$' or '%' before it and its structure path.
+  ;
+  Procedure.s GetDebuggerTooltipExpression(Line$, Column)
+    If Line$ <> "" And GetWordBoundary(@Line$, Len(Line$), Column, @WordStart, @WordEnd, 1) ; include * or #
+      If Mid(Line$, WordEnd+2, 2) = "()"
+        WordEnd + 2
+      EndIf
+      If Mid(Line$, WordStart, 1) = "$" Or Mid(Line$, WordStart, 1) = "%"
+        WordStart-1
+      EndIf
+      WordStart = GetStructurePathStart(@Line$, WordStart) ; evaluate 'Var\Field', not a variable named like the field
+
+      ProcedureReturn Mid(Line$, WordStart+1, WordEnd - WordStart + 1)
+    EndIf
+  EndProcedure
+
 CompilerEndIf
 
 
@@ -1075,6 +1233,27 @@ Procedure IsBasicKeyword(Word$, *LineStart = 0, *WordStart = 0)
 EndProcedure
 
 
+;  Checks if the word is a keyword which can be used inside a Structure or Interface block. Any other
+;  keyword is a field or method name there (like 'Data.i' or 'For()')
+;
+Procedure IsStructureBlockKeyword(Word$, *LineStart, *WordStart)
+  Select IsBasicKeyword(Word$, *LineStart, *WordStart)
+    Case #KEYWORD_Structure, #KEYWORD_EndStructure, #KEYWORD_Interface, #KEYWORD_EndInterface, #KEYWORD_Extends, #KEYWORD_Align,
+         #KEYWORD_Array, #KEYWORD_List, #KEYWORD_Map,
+         #KEYWORD_CompilerIf, #KEYWORD_CompilerElseIf, #KEYWORD_CompilerElse, #KEYWORD_CompilerEndIf,
+         #KEYWORD_CompilerSelect, #KEYWORD_CompilerCase, #KEYWORD_CompilerDefault, #KEYWORD_CompilerEndSelect,
+         #KEYWORD_CompilerError, #KEYWORD_CompilerWarning
+      ProcedureReturn #True
+      
+    CompilerIf Not #SpiderBasic
+      Case #KEYWORD_StructureUnion, #KEYWORD_EndStructureUnion
+        ProcedureReturn #True
+    CompilerEndIf
+  EndSelect
+  
+  ProcedureReturn #False
+EndProcedure
+
 Procedure IsDecNumber(*string.BYTE, length)
   If length < 0 Or ByteUcase(*string\b) = 'E' ; prevent variablenames like e1, e, e1225 from highlighting as numbers
     ProcedureReturn 0
@@ -1151,7 +1330,7 @@ EndProcedure
 #SkipSeparator = -2
 #ModuleSeparator = -2
 
-Procedure HighlightingEngine(*InBuffer, InBufferLength, CursorPosition, Callback.HighlightCallback, IsSourceCode, DisableFormatting = 0)
+Procedure HighlightingEngine(*InBuffer, InBufferLength, CursorPosition, Callback.HighlightCallback, IsSourceCode, DisableFormatting = 0, InsideStructure = 0)
 
   *Cursor.HighlightPTR = *InBuffer
   *InBufferEnd = *InBuffer + InBufferLength
@@ -1276,7 +1455,8 @@ Procedure HighlightingEngine(*InBuffer, InBufferLength, CursorPosition, Callback
       ; also not when its the first thing in a command, and a Asm keyword (and asm turned on)
       ; as And, Or, Xor and such only happen as keywords after something else, this will work
       ;
-    ElseIf IsBasicKeyword(WordStart$, *LineStart, *WordStart) And OldSeparatorChar <> '\' And (ASMEnabled = 0 Or IsASMKeyword(WordStart$) = 0 Or IsCommandStart(*LineStart, *WordStart) = 0)
+    ElseIf IsBasicKeyword(WordStart$, *LineStart, *WordStart) And OldSeparatorChar <> '\' And (ASMEnabled = 0 Or IsASMKeyword(WordStart$) = 0 Or IsCommandStart(*LineStart, *WordStart) = 0) And
+           (InsideStructure = #False Or (SeparatorChar <> '.' And IsStructureBlockKeyword(WordStart$, *LineStart, *WordStart)))
 
       ; -------------------- Basic Keywords -------------------------
 
@@ -1302,6 +1482,12 @@ Procedure HighlightingEngine(*InBuffer, InBufferLength, CursorPosition, Callback
           
         Case BasicKeywords(#KEYWORD_DisableASM), BasicKeywords(#KEYWORD_EndHeaderSection)
           DisableFormatting = #False
+          
+        Case BasicKeywords(#KEYWORD_Structure), BasicKeywords(#KEYWORD_Interface)
+          InsideStructure = #True
+          
+        Case BasicKeywords(#KEYWORD_EndStructure), BasicKeywords(#KEYWORD_EndInterface)
+          InsideStructure = #False
       EndSelect
 
     ElseIf SeparatorChar = ':' And *Cursor\a[1] = ':'
@@ -1331,23 +1517,28 @@ Procedure HighlightingEngine(*InBuffer, InBufferLength, CursorPosition, Callback
       ; --------------------- Procedures / Functions --------------------
       TextChanged = 0
 
-      FunctionPosition = IsAPIFunction(*WordStart, WordLength)
-      If FunctionPosition > -1
-
-        If DisableFormatting = #False And EnableCaseCorrection
-          TextChanged = CopyMemoryCheck(APIFunctions(FunctionPosition)\Ascii, *WordStart, WordLength-1)
-        EndIf
-
-      Else
-        FunctionPosition = IsBasicFunction(UCase(WordStart$))
-        If FunctionPosition > -1
-
-          If DisableFormatting = #False And EnableCaseCorrection And OldSeparatorChar <> '.' ; do not correct structure names
-            TextChanged = CopyMemoryCheck(BasicFunctions(FunctionPosition)\Ascii, *WordStart, WordLength)
+      ; Structure fields and interface methods can have the name of a function: keep the case of
+      ; the declaration and use it for the method calls, instead of the case of the function
+      If DisableFormatting = #False And EnableCaseCorrection And InsideStructure = #False
+        If OldSeparatorChar = '\'
+          ; other methods are never corrected, so only look up the declaration when needed
+          If InterfaceMethodCase And (IsAPIFunction(*WordStart, WordLength) > -1 Or IsBasicFunction(UCase(WordStart$)) > -1)
+            TextChanged = InterfaceMethodCase(*WordStart, WordLength)
           EndIf
 
-        EndIf
+        Else
+          FunctionPosition = IsAPIFunction(*WordStart, WordLength)
+          If FunctionPosition > -1
+            TextChanged = CopyMemoryCheck(APIFunctions(FunctionPosition)\Ascii, *WordStart, WordLength-1)
 
+          ElseIf OldSeparatorChar <> '.' ; do not correct structure names
+            FunctionPosition = IsBasicFunction(UCase(WordStart$))
+            If FunctionPosition > -1
+              TextChanged = CopyMemoryCheck(BasicFunctions(FunctionPosition)\Ascii, *WordStart, WordLength)
+            EndIf
+
+          EndIf
+        EndIf
       EndIf
 
       If OldSeparatorChar = '.'
@@ -1574,11 +1765,19 @@ Procedure HighlightingEngine(*InBuffer, InBufferLength, CursorPosition, Callback
 
                   Default
                     ; incorrect sequence. mark it with the "bad brace" color
+                    ; include the whole UTF-8 character after the '\', as a split character is displayed as invalid bytes
+                    EscapeLength = 2
+                    If SourceStringFormat = #PB_UTF8 And *Cursor\a[1] & %11000000 = %11000000
+                      While *Cursor+EscapeLength < *InBufferEnd And *Cursor\a[EscapeLength] & %11000000 = %10000000
+                        EscapeLength + 1
+                      Wend
+                    EndIf
+                    
                     If *Cursor > *StringStart
                       Callback(*StringStart, *Cursor-*StringStart, *StringColor, 0, 0)
                     EndIf
-                    Callback(*StringStart, 2, *BadEscapeColor, 0, 0)
-                    *Cursor + 2
+                    Callback(*StringStart, EscapeLength, *BadEscapeColor, 0, 0)
+                    *Cursor + EscapeLength
                     *StringStart = *Cursor
 
                 EndSelect

@@ -1575,6 +1575,8 @@ Enumeration 1
   #TIMER_ProcedureBrowser
   ; Timer for the help tool, to reload the help when its source is edited
   #TIMER_HelpTool
+  ; Timer to check for files sent by another IDE instance (RunOnce on Linux, when there is no client message filter)
+  #TIMER_RunOnce
 EndEnumeration
 
 ;- Custom PostEvent event types
@@ -2409,6 +2411,8 @@ Structure Issue
   Regex.i    ; compiled regex (#PB_Any)
   Style.l    ; code style (if ColorMode=1) -1 if not used
   Marker.l   ; code marker (if ColorMode=2) -1 if not used
+  HasDisplayGroup.l ; regex has a 'display' named group
+  HasMarkGroup.l    ; regex has a 'mark' named group
 EndStructure
 
 Structure FoundIssue

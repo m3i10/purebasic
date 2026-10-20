@@ -390,6 +390,12 @@ SetupFileMonitor()
 ; Can be done only after the gadget is displayed
 CompilerIf #CompileLinux
   ToolsPanelHiddenWidth = GetGadgetAttribute(#GADGET_ToolsPanel, #PB_Panel_TabHeight)
+  CompilerIf #CompileLinuxGtk
+    ; The vertical tabs of the hidden panel can need more width than the horizontal tab height (GTK3),
+    ; else they are pushed outside of the window and their labels can't be seen
+    gtk_widget_size_request_(GadgetID(#GADGET_ToolsPanelFake), @FakePanelSize.GtkRequisition)
+    ToolsPanelHiddenWidth = Max(ToolsPanelHiddenWidth, FakePanelSize\width)
+  CompilerEndIf
   If ToolsPanelVisible = 0
     ResizeMainWindow()
   EndIf
@@ -409,6 +415,14 @@ If ToolsPanelVisible
   Else
     SetGadgetState(#GADGET_ToolsSplitter, ToolsPanelWidth)
   EndIf
+  
+  CompilerIf #CompileMac
+    ; SetGadgetState() doesn't send a splitter event on OS X, so resize the current tool here,
+    ; else it keeps the size it had before the window got its final size
+    If CurrentTool
+      CurrentTool\ResizeHandler(GetPanelWidth(#GADGET_ToolsPanel), GetPanelHeight(#GADGET_ToolsPanel))
+    EndIf
+  CompilerEndIf
 Else
   ToolsPanelWidth_Hidden = ToolsPanelWidth
 EndIf

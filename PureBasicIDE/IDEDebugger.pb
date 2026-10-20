@@ -806,6 +806,14 @@ Procedure Debugger_SwitchToFile(*Debugger.DebuggerData, Line)
     result = LoadSourceFile(FileName$)
   EndIf
   
+  ; A form file is opened in the design view, so switch it to the code view to see the debugged line
+  If result And *ActiveSource And *ActiveSource <> *ProjectInfo And *ActiveSource\IsForm
+    *Form.FormWindow = *ActiveSource\IsForm
+    If *Form\current_view = 0
+      FD_ProcessMenuEvent(#MENU_FormSwitch)
+    EndIf
+  EndIf
+  
   ProcedureReturn result
 EndProcedure
 
@@ -1594,19 +1602,8 @@ Procedure Debugger_EvaluateAtCursor(position)
         linestart = SendEditorMessage(#SCI_POSITIONFROMLINE, line, 0)
         column    = CountCharacters(*ActiveSource\EditorGadget, linestart, position)
         Line$     = GetLine(line)
-        
-        If Line$ <> ""
-          GetWordBoundary(@Line$, Len(Line$), column, @selStart, @selEnd, 1) ; include * or #
-          If Mid(Line$, selEnd+2, 2) = "()"
-            selEnd + 2
-          EndIf
-          If Mid(Line$, selStart, 1) = "$" Or Mid(Line$, selStart, 1) = "%"
-            selStart-1
-          EndIf
-          
-          Expr$ = Mid(Line$, selStart+1, selEnd - selStart + 1)
-          IsVariableExpression = 1
-        EndIf
+        Expr$     = GetDebuggerTooltipExpression(Line$, column)
+        IsVariableExpression = 1
       EndIf
       
       ; Evaluate if there is a debugger...
